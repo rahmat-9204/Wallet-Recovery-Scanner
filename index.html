@@ -34,6 +34,7 @@ button {
     color:white;
     font-weight:bold;
 }
+button:disabled {opacity:.5}
 .clear {background:#555}
 .report {background:#16834a}
 .status {
@@ -63,35 +64,35 @@ button {
 <body>
 <main>
 <h2>Wallet Balance Scanner</h2>
-<h3>اطلاعات بازیابی</h3>
+<h3>اطلاعات گزارش</h3>
 
-کلمه گمشده بازیابی‌شده
+کلمه بازیابی‌شده
 جایگاه کلمه
 <option value="">انتخاب جایگاه</option>
 </select>
 <h3>آدرس‌های عمومی کیف پول</h3>
 
-Bitcoin
-Ethereum
+Bitcoin (BTC)
+Ethereum (ETH)
 BNB Smart Chain
 TRON
 شروع بررسی موجودی
 پاک کردن تاریخچه
 دانلود گزارش CSV
 
-<h3>وضعیت بررسی</h3>
+<h3>وضعیت</h3>
 <div id="status" class="status">آماده بررسی</div>
 <h3>تاریخچه دارایی‌های مثبت</h3>
 <div id="results"></div>
 <p class="small">
-این برنامه فقط موجودی کوین اصلی و USDT را بررسی می‌کند.
-توکن‌های دیگر و NFTها بررسی نمی‌شوند.
-خطای اتصال به API به معنی موجودی صفر نیست.
+فقط موجودی‌های مثبت ذخیره می‌شوند.
+خطای اتصال به معنی موجودی صفر نیست.
+این برنامه موجودی کوین اصلی و USDT را بررسی می‌کند.
 </p>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-/* USDT contracts */
+/* Token contracts */
 const USDT = {
     ETH:
     "0xdAC17F958D2ee523a2206206994597C13D831ec7",
@@ -100,7 +101,14 @@ const USDT = {
     TRON:
     "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
 };
-/* Position selector */
+/* RPC */
+const RPC = {
+    ETH:
+    "https://ethereum-rpc.publicnode.com",
+    BNB:
+    "https://bsc-rpc.publicnode.com"
+};
+/* Position */
 for(let i=1;i<=12;i++){
     const option=document.createElement("option");
     option.value=i;
@@ -122,7 +130,7 @@ function save(){
         JSON.stringify(history)
     );
 }
-/* Display */
+/* Render */
 function render(){
     $("results").innerHTML="";
     history.slice().reverse().forEach(item=>{
@@ -135,7 +143,7 @@ function render(){
             "کلمه: "+item.word,
             "جایگاه کلمه: "+item.position,
             "شبکه: "+item.network,
-            "نوع دارایی: "+item.asset,
+            "دارایی: "+item.asset,
             "آدرس: "+item.address,
             "موجودی: "+item.balance,
             "تاریخ: "+item.date
@@ -160,7 +168,7 @@ async function getJSON(url){
             signal:controller.signal
         });
         if(!response.ok){
-            throw new Error("HTTP "+response.status);
+            throw Error("HTTP "+response.status);
         }
         return await response.json();
     }finally{
@@ -173,11 +181,13 @@ async function checkBTC(address){
         "https://blockstream.info/api/address/"+
         encodeURIComponent(address)
     );
-    const balance=
+    const confirmed=
         data.chain_stats.funded_txo_sum-
-        data.chain_stats.spent_txo_sum+
+        data.chain_stats.spent_txo_sum;
+    const unconfirmed=
         data.mempool_stats.funded_txo_sum-
         data.mempool_stats.spent_txo_sum;
+    const balance=confirmed+unconfirmed;
     return {
         amount:balance/100000000,
         unit:"BTC"
@@ -192,66 +202,57 @@ async function rpc(url,method,params){
         },
         body:JSON.stringify({
             jsonrpc:"2.0",
-            method,
-            params,
+            method:method,
+            params:params,
             id:1
         })
     });
     if(!response.ok){
-        throw new Error("RPC HTTP "+response.status);
+        throw Error("RPC HTTP "+response.status);
     }
     const data=await response.json();
     if(data.error){
-        throw new Error(data.error.message);
+        throw Error(data.error.message);
     }
     if(data.result===undefined){
-        throw new Error("Invalid RPC response");
+        throw Error("Invalid RPC response");
     }
     return data.result;
 }
-/* ETH and BNB native balance */
+/* Native ETH / BNB */
 async function checkNative(address,network){
-    const rpcURL={
-        ETH:"https://ethereum-rpc.publicnode.com",
-        BNB:"https://bsc-rpc.publicnode.com"
-    }[network];
     const result=await rpc(
-        rpcURL,
+        RPC[network],
         "eth_getBalance",
         [address,"latest"]
     );
-    const amount=BigInt(result);
+    const raw=BigInt(result);
     return {
-        amount:Number(amount)/1e18,
+        amount:Number(raw)/1e18,
         unit:network
     };
 }
 /* ERC20 / BEP20 USDT */
 async function checkEVMUSDT(address,network){
-    const rpcURL={
-        ETH:"https://ethereum-rpc.publicnode.com",
-        BNB:"https://bsc-rpc.publicnode.com"
-    }[network];
-    const contract=USDT[network];
     if(!/^0x[a-fA-F0-9]{40}$/.test(address)){
-        throw new Error("Invalid EVM address");
+        throw Error("Invalid EVM address");
     }
-    const cleanAddress=address.slice(2).toLowerCase();
-    const data="0x70a08231"+cleanAddress.padStart(64,"0");
+    const contract=USDT[network];
+    const clean=address.slice(2).toLowerCase();
+    const callData=
+        "0x70a08231"+clean.padStart(64,"0");
     const result=await rpc(
-        rpcURL,
+        RPC[network],
         "eth_call",
         [
             {
                 to:contract,
-                data:data
+                data:callData
             },
             "latest"
         ]
     );
     const raw=BigInt(result);
-    // Ethereum USDT: 6 decimals
-    // BNB Binance-Peg USDT: 18 decimals
     const decimals=network==="BNB"?18:6;
     return {
         amount:Number(raw)/Math.pow(10,decimals),
@@ -269,14 +270,13 @@ async function checkTRONAccount(address){
 async function checkTRX(address){
     const data=await checkTRONAccount(address);
     const account=data.data?.[0];
-    const balance=account?
-        Number(account.balance||0):0;
     return {
-        amount:balance/1000000,
+        amount:account?
+            Number(account.balance||0)/1000000:0,
         unit:"TRX"
     };
 }
-/* TRC20 USDT */
+/* TRON USDT */
 async function checkTRONUSDT(address){
     const data=await checkTRONAccount(address);
     const account=data.data?.[0];
@@ -286,13 +286,32 @@ async function checkTRONUSDT(address){
             unit:"USDT"
         };
     }
-    const tokens=account.trc20||{};
-    const contract=USDT.TRON;
+    const tokens=account.trc20||[];
+    const contract=USDT.TRON.toLowerCase();
     let raw="0";
-    for(const [key,value] of Object.entries(tokens)){
-        if(key.toLowerCase()===contract.toLowerCase()){
-            raw=String(value);
-            break;
+    // TronGrid may return an array of token objects
+    // or an object keyed by contract address.
+    if(Array.isArray(tokens)){
+        for(const token of tokens){
+            if(!token || typeof token!=="object")continue;
+            for(const [key,value] of Object.entries(token)){
+                if(key.toLowerCase()===contract){
+                    raw=String(value);
+                }
+            }
+            const tokenContract=
+                token.contract_address||
+                token.contractAddress||
+                "";
+            if(tokenContract.toLowerCase()===contract){
+                raw=String(token.balance||"0");
+            }
+        }
+    }else if(typeof tokens==="object"){
+        for(const [key,value] of Object.entries(tokens)){
+            if(key.toLowerCase()===contract){
+                raw=String(value);
+            }
         }
     }
     return {
@@ -300,18 +319,18 @@ async function checkTRONUSDT(address){
         unit:"USDT"
     };
 }
-/* Save positive balances only */
+/* Save only positive results */
 function addResult(network,asset,address,balance){
     if(!Number.isFinite(balance.amount)){
-        throw new Error("Invalid balance");
+        throw Error("Invalid balance");
     }
-    if(balance.amount<=0)return;
+    if(balance.amount<=0)return false;
     const item={
         word:$("word").value.trim(),
         position:$("position").value,
-        network:network,
-        asset:asset,
-        address:address,
+        network,
+        asset,
+        address,
         balance:balance.amount+" "+balance.unit,
         date:new Date().toLocaleString()
     };
@@ -327,14 +346,15 @@ function addResult(network,asset,address,balance){
         save();
         render();
     }
+    return true;
 }
-/* Main scanner */
+/* Main */
 async function run(){
     const word=$("word").value.trim();
     const position=$("position").value;
     if(!word||!position){
         $("status").textContent=
-            "کلمه و جایگاه آن را وارد کن.";
+            "کلمه و جایگاه را وارد کن.";
         return;
     }
     const addresses={
@@ -345,7 +365,7 @@ async function run(){
     };
     if(!Object.values(addresses).some(Boolean)){
         $("status").textContent=
-            "حداقل یک آدرس وارد کن.";
+            "حداقل یک آدرس عمومی وارد کن.";
         return;
     }
     const tasks=[];
@@ -403,28 +423,28 @@ async function run(){
     let found=0;
     let errors=0;
     $("start").disabled=true;
-    $("status").textContent="بررسی شروع شد...";
+    $("status").textContent="شروع بررسی...";
     try{
         for(const task of tasks){
+            $("status").textContent=
+                "در حال بررسی "+task.asset+
+                " در شبکه "+task.network+"...";
             try{
                 const balance=await task.fn();
                 checked++;
                 if(balance.amount>0){
-                    addResult(
+                    if(addResult(
                         task.network,
                         task.asset,
                         task.address,
                         balance
-                    );
-                    found++;
+                    )){
+                        found++;
+                    }
                 }
             }catch(error){
                 errors++;
-                console.error(
-                    task.network,
-                    task.asset,
-                    error
-                );
+                console.error(task.asset,error);
             }
             $("status").textContent=
                 "بررسی‌شده: "+checked+
@@ -433,7 +453,7 @@ async function run(){
         }
         $("status").textContent+=
             "\nبررسی پایان یافت."+
-            "\nتوجه: خطای اتصال به معنی موجودی صفر نیست.";
+            "\nخطای اتصال به معنی موجودی صفر نیست.";
     }finally{
         $("start").disabled=false;
     }
@@ -441,7 +461,7 @@ async function run(){
 /* Buttons */
 $("start").onclick=run;
 $("clear").onclick=()=>{
-    if(confirm("تمام تاریخچه پاک شود؟")){
+    if(confirm("تاریخچه پاک شود؟")){
         history=[];
         save();
         render();
