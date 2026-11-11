@@ -1,99 +1,33 @@
-<!doctype html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Wallet Recovery Scanner — Local BIP39 Check</title>
-<style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#10151d;color:#edf2f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:18px;line-height:1.7}
-main{max-width:760px;margin:auto}.card{background:#1a2430;border:1px solid #344252;border-radius:16px;padding:18px;margin:14px 0}
-h1{font-size:23px;margin:0 0 8px}h2{font-size:18px;margin:0 0 10px}.muted{color:#aebdca;font-size:14px}
-label{display:block;margin:12px 0 6px}textarea,input,button{font:inherit}textarea{width:100%;min-height:120px;background:#0d131b;color:#fff;border:1px solid #526477;border-radius:10px;padding:12px;direction:ltr;text-align:left}
-button{border:0;border-radius:10px;padding:12px 16px;background:#238636;color:white;font-weight:700;margin:8px 5px 0 0}
-button.secondary{background:#344252}button:disabled{opacity:.5}
-#status{white-space:pre-wrap;color:#b8d5ff}#results{direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;background:#0d131b;border-radius:10px;padding:12px;max-height:360px;overflow:auto}
-.warn{border-right:4px solid #e0a72e}.ok{color:#8de0a2}.bad{color:#ff9b9b}
-</style>
-</head>
-<body><main>
-<div class="card">
-<h1>Wallet Recovery Scanner</h1>
-<div class="muted">بررسی محلی عبارت ۱۲ کلمه‌ای BIP39 انگلیسی — بدون ارسال کلمات به سرور</div>
-</div>
-<div class="card warn">
-<b>هشدار امنیتی مهم</b>
-<p class="muted">این صفحه را ترجیحاً دانلود کن و به‌صورت فایل محلی در مرورگر باز کن. عبارت بازیابی را در چت، GitHub، فرم آنلاین یا دستگاه دیگر وارد نکن. این نسخه فقط عبارت‌های معتبر BIP39 را پیدا می‌کند؛ هنوز موجودی شبکه‌ها یا آدرس کیف پول را بررسی نمی‌کند.</p>
-</div>
-<div class="card">
-<h2>۱) یازده کلمه‌ای که داری</h2>
-<label for="words">کلمات را با فاصله وارد کن. جای کلمه گمشده را خالی نگذار؛ فقط همان ۱۱ کلمه را به ترتیب شناخته‌شده وارد کن.</label>
-<textarea id="words" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="word1 word2 word3 ... word11"></textarea>
-<button id="run">بررسی هر ۱۲ موقعیت</button>
-<button class="secondary" id="clear">پاک‌کردن</button>
-<div id="status" class="muted" aria-live="polite"></div>
-</div>
-<div class="card">
-<h2>۲) نتیجه</h2>
-<div id="summary" class="muted">هنوز بررسی آغاز نشده است.</div>
-<pre id="results"></pre>
-<button class="secondary" id="download" disabled>دانلود فهرست نتایج روی همین دستگاه</button>
-</div>
-</main>
-<script>
-const WORDLIST_URL = "https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt";
-let found = [];
-const $ = id => document.getElementById(id);
-function setStatus(s){$("status").textContent=s}
-function bytesToBits(bytes){return [...bytes].map(b=>b.toString(2).padStart(8,"0")).join("")}
-async function sha256(bytes){return new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))}
-async function validBip39(words, indexMap){
-  if(words.length!==12 || words.some(w=>!indexMap.has(w))) return false;
-  let bits=words.map(w=>indexMap.get(w).toString(2).padStart(11,"0")).join("");
-  let entropyBits=bits.slice(0,128), checksumBits=bits.slice(128);
-  let entropy=new Uint8Array(16);
-  for(let i=0;i<16;i++) entropy[i]=parseInt(entropyBits.slice(i*8,i*8+8),2);
-  let digest=await sha256(entropy);
-  return checksumBits===bytesToBits(digest).slice(0,4);
-}
-$("run").addEventListener("click", async()=>{
-  $("run").disabled=true; $("download").disabled=true; found=[];
-  $("results").textContent=""; $("summary").textContent="";
-  try{
-    if(!window.crypto?.subtle) throw new Error("مرورگر از Web Crypto پشتیبانی نمی‌کند. صفحه را در Safari باز کن.");
-    const known=$("words").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if(known.length!==11) throw new Error("باید دقیقاً ۱۱ کلمه وارد شود؛ تعداد فعلی: "+known.length);
-    setStatus("دریافت فهرست استاندارد BIP39 از منبع رسمی…");
-    const response=await fetch(WORDLIST_URL,{cache:"no-store"});
-    if(!response.ok) throw new Error("دریافت فهرست کلمات ناموفق بود. اینترنت را بررسی کن.");
-    const list=(await response.text()).trim().split(/\r?\n/);
-    if(list.length!==2048) throw new Error("فهرست BIP39 معتبر دریافت نشد.");
-    const map=new Map(list.map((w,i)=>[w,i]));
-    const invalid=known.filter(w=>!map.has(w));
-    if(invalid.length) throw new Error("این کلمات در فهرست انگلیسی BIP39 نیستند: "+invalid.join(", "));
-    let checked=0;
-    for(let pos=0;pos<12;pos++){
-      for(const candidate of list){
-        const phrase=known.slice(); phrase.splice(pos,0,candidate);
-        if(await validBip39(phrase,map)){
-          found.push({position:pos+1,word:candidate,phrase:phrase.join(" ")});
-        }
-        checked++;
-      }
-      setStatus(`بررسی تمام شد: موقعیت ${pos+1} از ۱۲ — ${checked.toLocaleString()} حالت بررسی شد.`);
-      $("summary").textContent=`حالت‌های بررسی‌شده: ${checked.toLocaleString()} | عبارت‌های معتبر BIP39: ${found.length}`;
-      $("results").textContent=found.map((x,i)=>`${i+1}) Missing position ${x.position} | Candidate: ${x.word}\n${x.phrase}`).join("\n\n");
-      await new Promise(r=>setTimeout(r,0));
-    }
-    setStatus("پایان بررسی. نتایج فقط در حافظه همین صفحه هستند.");
-    $("download").disabled=found.length===0;
-  }catch(e){setStatus("خطا: "+e.message)}
-  finally{$("run").disabled=false}
-});
-$("download").addEventListener("click",()=>{
-  const text=found.map((x,i)=>`${i+1}) Position ${x.position} | Word: ${x.word}\n${x.phrase}`).join("\n\n");
-  const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="bip39-candidates.txt";a.click();URL.revokeObjectURL(a.href);
-});
-$("clear").addEventListener("click",()=>{$("words").value="";$("results").textContent="";$("summary").textContent="هنوز بررسی آغاز نشده است.";$("status").textContent="";found=[];$("download").disabled=true});
-</script>
-</body></html>
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wallet Recovery Scanner v2</title><style>
+*{box-sizing:border-box}body{margin:0;padding:16px;background:#10151d;color:#eef3f8;font:16px/1.8 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:760px;margin:auto}.card{background:#1a2430;border:1px solid #39495a;border-radius:14px;padding:16px;margin:12px 0}h1{font-size:23px;margin:0 0 8px}h2{font-size:18px;margin:0 0 8px}.muted{color:#b5c2cf;font-size:14px}.warning{border-right:4px solid #e3aa39}.danger{color:#ffb3b3}textarea{width:100%;min-height:110px;background:#0d131b;color:white;border:1px solid #526477;border-radius:10px;padding:12px;direction:ltr;text-align:left;font-size:16px}button{border:0;border-radius:9px;padding:12px 15px;background:#238636;color:white;font-weight:700;font-size:15px;margin:8px 4px 0 0}button.secondary{background:#344252}button.stop{background:#9b3434}button:disabled{opacity:.45}progress{width:100%;height:18px}pre{direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;background:#0d131b;border-radius:9px;padding:12px;min-height:60px}
+</style></head><body><main>
+<section class="card"><h1>Wallet Recovery Scanner</h1><div class="muted">اسکن محلی عبارت ۱۲ کلمه‌ای BIP39 انگلیسی — نسخه با ذخیره مرحله</div></section>
+<section class="card warning"><b>امنیت و محدودیت‌ها</b><p class="muted">این فایل را دانلود و محلی در دستگاه خودت باز کن؛ عبارت بازیابی را در GitHub Pages وارد نکن. کلمات به سرور ارسال نمی‌شوند. فهرست استاندارد BIP39 در شروع از اینترنت دریافت می‌شود.</p><p class="muted danger">این نسخه فقط عبارت‌های معتبر BIP39 را پیدا می‌کند؛ هنوز آدرس و موجودی BTC/ETH/BNB/TRON را بررسی نمی‌کند. نتیجه معتبر BIP39 الزاماً کیف پول اصلی نیست.</p></section>
+<section class="card"><h2>۱) یازده کلمه شناخته‌شده</h2><label for="words">۱۱ کلمه را به ترتیب اصلی وارد کن؛ آن‌ها را برای هیچ‌کس ارسال نکن.</label><textarea id="words" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="eleven English words separated by spaces"></textarea><button id="start">شروع / ادامه اسکن</button><button id="pause" class="stop" disabled>توقف</button><button id="reset" class="secondary">پاک‌کردن پیشرفت</button><p id="status" class="muted" aria-live="polite">آماده</p><progress id="bar" max="24576" value="0"></progress><p id="counts" class="muted">۰ از ۲۴٬۵۷۶ حالت</p></section>
+<section class="card"><h2>۲) نتیجه</h2><p class="muted">نتایج فقط در همین صفحه نمایش داده می‌شوند و در حافظه دائمی ذخیره نمی‌شوند.</p><pre id="out">هنوز نتیجه‌ای وجود ندارد.</pre></section>
+</main><script>
+"use strict";
+const URL_WORDS="https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt",DB="wallet-recovery-progress-v2",STORE="progress",TOTAL=24576,$=id=>document.getElementById(id);
+let stopping=false,running=false,found=[];
+function dbOpen(){return new Promise((ok,no)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+async function getP(){let d=await dbOpen();return new Promise((ok,no)=>{let r=d.transaction(STORE).objectStore(STORE).get("p");r.onsuccess=()=>ok(r.result||{pos:0,idx:0,done:0});r.onerror=()=>no(r.error)})}
+async function saveP(p){let d=await dbOpen();return new Promise((ok,no)=>{let t=d.transaction(STORE,"readwrite");t.objectStore(STORE).put(p,"p");t.oncomplete=ok;t.onerror=()=>no(t.error)})}
+async function clearP(){let d=await dbOpen();return new Promise((ok,no)=>{let t=d.transaction(STORE,"readwrite");t.objectStore(STORE).clear();t.oncomplete=ok;t.onerror=()=>no(t.error)})}
+const bits=b=>Array.from(b,x=>x.toString(2).padStart(8,"0")).join("");
+async function valid(ws,map){let s=ws.map(w=>map.get(w).toString(2).padStart(11,"0")).join(""),e=s.slice(0,128),c=s.slice(128),b=new Uint8Array(16);for(let i=0;i<16;i++)b[i]=parseInt(e.slice(i*8,i*8+8),2);let h=new Uint8Array(await crypto.subtle.digest("SHA-256",b));return c===bits(h).slice(0,4)}
+function progress(p){$("bar").value=p.done;$("counts").textContent=`${p.done.toLocaleString("en-US")} از ${TOTAL.toLocaleString("en-US")} حالت بررسی شده | موقعیت ${Math.min(12,p.pos+1)} از ۱۲`}
+$("start").onclick=async()=>{if(running)return;running=true;stopping=false;$("start").disabled=true;$("pause").disabled=false;try{
+if(!crypto.subtle||!indexedDB)throw Error("Safari به‌روز با Web Crypto و IndexedDB لازم است.");
+let known=$("words").value.trim().toLowerCase().split(/\s+/).filter(Boolean);if(known.length!==11)throw Error("دقیقاً ۱۱ کلمه لازم است.");
+$("status").textContent="دریافت فهرست BIP39…";let res=await fetch(URL_WORDS);if(!res.ok)throw Error("فهرست کلمات دریافت نشد؛ اینترنت را بررسی کن.");let list=(await res.text()).trim().split(/\r?\n/);if(list.length!==2048)throw Error("فهرست BIP39 نامعتبر است.");let map=new Map(list.map((w,i)=>[w,i])),bad=known.filter(w=>!map.has(w));if(bad.length)throw Error("کلمه خارج از فهرست انگلیسی BIP39: "+bad.join(", "));
+let p=await getP();if(p.pos>=12)throw Error("اسکن قبلی کامل است؛ برای شروع تازه پیشرفت را پاک کن.");progress(p);
+for(let pos=p.pos;pos<12;pos++){for(let idx=(pos===p.pos?p.idx:0);idx<2048;idx++){if(stopping){p={pos,idx,done:p.done};await saveP(p);progress(p);$("status").textContent="متوقف شد؛ پیشرفت ذخیره شد. برای ادامه همان ۱۱ کلمه را دوباره وارد کن.";return}
+let phrase=known.slice();phrase.splice(pos,0,list[idx]);if(await valid(phrase,map)){found.push(`موقعیت ${pos+1} | کلمه احتمالی: ${list[idx]}`);$("out").textContent=found.join("\n")}
+p={pos,idx:idx+1,done:p.done+1};if(p.done%32===0){await saveP(p);progress(p);$("status").textContent=`در حال بررسی موقعیت ${pos+1} از ۱۲…`;await new Promise(r=>setTimeout(r,0))}
+}p={pos:pos+1,idx:0,done:p.done};await saveP(p);progress(p)}
+$("status").textContent="اسکن کامل شد. عبارت‌های معتبر در بخش نتیجه دیده می‌شوند.";
+}catch(e){$("status").textContent="خطا: "+e.message}finally{running=false;$("start").disabled=false;$("pause").disabled=true}};
+$("pause").onclick=()=>{stopping=true;$("pause").disabled=true;$("status").textContent="درخواست توقف ثبت شد…"};
+$("reset").onclick=async()=>{if(running)return;await clearP();found=[];$("out").textContent="نتیجه پاک شد.";$("bar").value=0;$("counts").textContent=`۰ از ${TOTAL.toLocaleString("en-US")} حالت`;$("status").textContent="پیشرفت پاک شد."};
+(async()=>{try{let p=await getP();progress(p);if(p.done)$("status").textContent="پیشرفت قبلی موجود است؛ برای ادامه همان ۱۱ کلمه را دوباره وارد کن."}catch(e){}})();
+</script></body></html>
