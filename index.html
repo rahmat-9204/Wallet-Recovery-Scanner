@@ -146,6 +146,7 @@ import {
 const $ = id => document.getElementById(id);
 
 let stopFlag = false;
+let running = false;
 let results = [];
 
 try {
@@ -497,7 +498,7 @@ async function checkBTC(address) {
 }
 
 
-/* ETH / BNB */
+/* ETH / BNB RPC */
 
 async function rpc(url,method,params) {
 
@@ -535,7 +536,42 @@ async function checkEVM(url,address) {
 }
 
 
-/* TRON */
+/* USDT ERC20 / BEP20 */
+
+function makeBalanceOfData(address) {
+
+    return "0x70a08231" +
+        address.slice(2).toLowerCase().padStart(64,"0");
+}
+
+async function checkUSDT_EVM(url,address,contract,decimals) {
+
+    const data = await rpc(
+        url,
+        "eth_call",
+        [
+            {
+                to:contract,
+                data:makeBalanceOfData(address)
+            },
+            "latest"
+        ]
+    );
+
+    const raw = BigInt(data || "0x0");
+
+    return {
+        raw:raw.toString(),
+        balance:Number(raw)/Math.pow(10,decimals),
+        decimals:decimals
+    };
+}
+
+
+/* TRON account and TRC20 USDT */
+
+const USDT_TRON_CONTRACT =
+"TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
 async function checkTRON(address) {
 
@@ -551,7 +587,36 @@ async function checkTRON(address) {
 
     return {
         balance_sun:data ? data.balance : 0,
-        balance_TRX:data ? data.balance/1000000 : 0
+        balance_TRX:data ? data.balance/1000000 : 0,
+        tokens:data && Array.isArray(data.trc20)
+            ? data.trc20
+            : []
+    };
+}
+
+function checkTRON_USDT(tronData) {
+
+    const tokenList = tronData.tokens || [];
+
+    for (const token of tokenList) {
+
+        const balance =
+            token[USDT_TRON_CONTRACT];
+
+        if (balance !== undefined) {
+
+            const raw = BigInt(balance);
+
+            return {
+                raw:raw.toString(),
+                balance:Number(raw)/1000000
+            };
+        }
+    }
+
+    return {
+        raw:"0",
+        balance:0
     };
 }
 
@@ -591,7 +656,6 @@ function getPositiveAssets(result) {
 
                 positive[network] = {
                     address:result.addresses[network],
-                    balance_wei:balance.toString(),
                     balance_native:
                     Number(balance)/1e18
                 };
@@ -609,6 +673,25 @@ function getPositiveAssets(result) {
                 positive[network] = {
                     address:result.addresses[network],
                     balance_TRX:data.balance_TRX
+                };
+            }
+        }
+
+        if (network.startsWith("USDT_")) {
+
+            const balance = Number(data.balance || 0);
+
+            if (balance > 0) {
+
+                positive[network] = {
+                    address:result.addresses[
+                        network === "USDT_TRC20"
+                        ? "TRON"
+                        : network === "USDT_ERC20"
+                        ? "ETH"
+                        : "BNB"
+                    ],
+                    balance_USDT:balance
                 };
             }
         }
@@ -717,6 +800,11 @@ function render() {
                     "موجودی TRX: " + asset.balance_TRX;
             }
 
+            if (network.startsWith("USDT_")) {
+                balance.textContent =
+                    "موجودی USDT: " + asset.balance_USDT;
+            }
+
             section.appendChild(name);
             section.appendChild(address);
             section.appendChild(balance);
@@ -737,6 +825,9 @@ const sleep = ms =>
 
 async function scan() {
 
+    if (running) return;
+
+    running = true;
     stopFlag = false;
 
     const words = $("words")
@@ -748,11 +839,13 @@ async function scan() {
 
     if (words.length !== 11) {
         status("خطا: دقیقاً ۱۱ کلمه وارد کن.");
+        running = false;
         return;
     }
 
     if (words.some(word=>!wordlist.includes(word))) {
         status("خطا: یک یا چند کلمه در فهرست BIP39 نیست.");
+        running = false;
         return;
     }
 
@@ -792,22 +885,19 @@ async function scan() {
                 wordlist[cursor.index]
             );
 
-            cursor.index++;
-
             if (
                 !validateMnemonic(
                     candidate.join(" "),
                     wordlist
                 )
             ) {
+                cursor.index++;
                 saveCursor(cursor);
                 continue;
             }
 
             cursor.valid++;
             checked++;
-
-            saveCursor(cursor);
 
             status(
                 "عبارت معتبر شماره: "+cursor.valid+
@@ -880,6 +970,28 @@ async function scan() {
             }
 
 
+            /* USDT ERC20 */
+
+            if (!stopFlag) {
+
+                try {
+                    result.checks.USDT_ERC20 =
+                        await checkUSDT_EVM(
+                            "https://ethereum-rpc.publicnode.com",
+                            addresses.ETH,
+                            "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                            6
+                        );
+                } catch(error) {
+                    result.checks.USDT_ERC20 = {
+                        error:String(error.message||error)
+                    };
+                }
+
+                await sleep(500);
+            }
+
+
             /* BNB */
 
             if (!stopFlag) {
@@ -900,15 +1012,47 @@ async function scan() {
             }
 
 
-            /* TRON */
+            /* USDT BEP20 */
 
             if (!stopFlag) {
 
                 try {
+                    result.checks.USDT_BEP20 =
+                        await checkUSDT_EVM(
+                            "https://bsc-rpc.publicnode.com",
+                            addresses.BNB,
+                            "0x55d398326f99059fF775485246999027B3197955",
+                            18
+                        );
+                } catch(error) {
+                    result.checks.USDT_BEP20 = {
+                        error:String(error.message||error)
+                    };
+                }
+
+                await sleep(500);
+            }
+
+
+            /* TRON and USDT TRC20 */
+
+            if (!stopFlag) {
+
+                try {
+
                     result.checks.TRON =
                         await checkTRON(addresses.TRON);
+
+                    result.checks.USDT_TRC20 =
+                        checkTRON_USDT(result.checks.TRON);
+
                 } catch(error) {
+
                     result.checks.TRON = {
+                        error:String(error.message||error)
+                    };
+
+                    result.checks.USDT_TRC20 = {
                         error:String(error.message||error)
                     };
                 }
@@ -950,6 +1094,11 @@ async function scan() {
 
             }
 
+            /* Move cursor after this candidate is checked */
+
+            cursor.index++;
+            saveCursor(cursor);
+
             candidate.fill("");
 
             await sleep(500);
@@ -981,6 +1130,8 @@ async function scan() {
             "\nپیشرفت ذخیره شده است."
         );
 
+    } finally {
+        running = false;
     }
 }
 
@@ -995,6 +1146,11 @@ $("stop").onclick = () => {
 };
 
 $("clear").onclick = () => {
+
+    if (running) {
+        alert("ابتدا اسکن را متوقف کن.");
+        return;
+    }
 
     if (confirm("پیشرفت و گزارش‌ها پاک شود؟")) {
 
@@ -1032,6 +1188,8 @@ $("csv").onclick = () => {
                 balance = asset.balance_native;
             } else if (network === "TRON") {
                 balance = asset.balance_TRX;
+            } else if (network.startsWith("USDT_")) {
+                balance = asset.balance_USDT;
             }
 
             rows.push([
