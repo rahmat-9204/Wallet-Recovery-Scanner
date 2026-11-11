@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>USDT Wallet Scanner</title>
+<title>Wallet Balance Scanner</title>
+
 <style>
 body {
     font-family: Arial, sans-serif;
@@ -37,6 +38,7 @@ button {
 .stop { background: #a52a2a; }
 .clear { background: #555; }
 .report { background: #16834a; }
+
 .warning {
     background: #fff1d0;
     color: #674800;
@@ -44,6 +46,7 @@ button {
     border-radius: 8px;
     line-height: 1.8;
 }
+
 .status {
     background: #edf2fa;
     padding: 12px;
@@ -51,6 +54,7 @@ button {
     white-space: pre-wrap;
     line-height: 1.8;
 }
+
 .result {
     background: #f8f9fc;
     border: 1px solid #d5dce8;
@@ -61,267 +65,691 @@ button {
     text-align: left;
     overflow-wrap: anywhere;
 }
+
+.small {
+    font-size: 13px;
+    color: #667085;
+    line-height: 1.7;
+}
 </style>
 </head>
+
 <body>
 <main>
-<h2>USDT Wallet Balance Scanner</h2>
-<p>بررسی موجودی تتر در سه شبکه اصلی.</p>
+
+<h2>Wallet Balance Scanner</h2>
+
+<p>بررسی موجودی ارزهای دیجیتال و تتر.</p>
+
 <div class="warning">
-این برنامه فقط آدرس عمومی کیف پول را بررسی می‌کند.
-هیچ عبارت بازیابی یا کلید خصوصی وارد نکن.
+<strong>هشدار امنیتی:</strong>
+فقط آدرس عمومی کیف پول را وارد کن.
+عبارت بازیابی و کلید خصوصی را وارد نکن.
 </div>
-<h3>۱. آدرس‌های کیف پول</h3>
+
+<h3>۱. آدرس کیف پول</h3>
+
 <textarea id="addresses" rows="5"
 placeholder="هر آدرس را در یک خط وارد کن"></textarea>
+
 <button id="start">شروع بررسی</button>
 <button id="stop" class="stop">توقف بررسی</button>
 <button id="clear" class="clear">پاک کردن نتایج</button>
 <button id="csv" class="report">دانلود گزارش CSV</button>
+
 <h3>وضعیت</h3>
 <div id="status" class="status">آماده شروع</div>
+
 <h3>دارایی‌های پیدا شده</h3>
 <div id="results"></div>
+
+<p class="small">
+این برنامه فقط موجودی آدرس‌های عمومی را بررسی می‌کند.
+نتایج مثبت ذخیره می‌شوند.
+</p>
+
 </main>
+
 <script>
+
 const $ = id => document.getElementById(id);
-let stopped = false;
-let results = JSON.parse(
-    localStorage.getItem("usdt_results") || "[]"
-);
-const CONTRACTS = {
-    ERC20: {
-        address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-        rpc: "https://ethereum-rpc.publicnode.com"
+
+let stopFlag = false;
+
+let results = [];
+
+try {
+    results = JSON.parse(
+        localStorage.getItem("wallet_results") || "[]"
+    );
+} catch {
+    results = [];
+}
+
+
+/* NETWORK SETTINGS */
+
+const CONFIG = {
+
+    ETH: {
+        rpc: "https://ethereum-rpc.publicnode.com",
+        usdt: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        decimals: 6
     },
-    BEP20: {
-        address: "0x55d398326f99059fF775485246999027B3197955",
-        rpc: "https://bsc-rpc.publicnode.com"
+
+    BNB: {
+        rpc: "https://bsc-rpc.publicnode.com",
+        usdt: "0x55d398326f99059fF775485246999027B3197955",
+        decimals: 18
     }
+
 };
-const TRON_CONTRACT =
+
+const TRON_USDT =
 "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj";
+
+
+/* HELPERS */
+
 function status(text) {
     $("status").textContent = text;
 }
-function save() {
+
+function saveResults() {
+
     localStorage.setItem(
-        "usdt_results",
+        "wallet_results",
         JSON.stringify(results)
     );
 }
+
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-function validEVM(address) {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
+
+function validBTC(address) {
+
+    return /^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-z0-9]{25,90})$/.test(address);
 }
+
 function validTRON(address) {
+
     return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
 }
+
+function validEVM(address) {
+
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+
+function formatUnits(value, decimals) {
+
+    const number = BigInt(value);
+
+    const base = 10n ** BigInt(decimals);
+
+    const whole = number / base;
+
+    const fraction = number % base;
+
+    return whole.toString() + "." +
+        fraction.toString().padStart(decimals, "0")
+        .replace(/0+$/, "");
+}
+
+
+/* JSON FETCH */
+
+async function fetchJSON(url, options = {}) {
+
+    const controller = new AbortController();
+
+    const timer = setTimeout(
+        () => controller.abort(),
+        15000
+    );
+
+    try {
+
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            throw Error("HTTP " + response.status);
+        }
+
+        return await response.json();
+
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+
+/* RPC */
+
 async function rpc(url, method, params) {
-    const response = await fetch(url, {
+
+    const data = await fetchJSON(url, {
+
         method: "POST",
+
         headers: {
             "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
+
             jsonrpc: "2.0",
+
             id: 1,
+
             method,
+
             params
+
         })
+
     });
-    if (!response.ok) {
-        throw Error("RPC HTTP " + response.status);
-    }
-    const data = await response.json();
+
     if (data.error) {
         throw Error(data.error.message);
     }
+
     return data.result;
 }
-/* ERC20 / BEP20 */
-async function checkEVM(address, network) {
-    const config = CONTRACTS[network];
-    const cleanAddress = address.slice(2).toLowerCase();
-    const data = await rpc(
-        config.rpc,
-        "eth_call",
-        [{
-            to: config.address,
-            data: "0x70a08231" +
-                  cleanAddress.padStart(64, "0")
-        }, "latest"]
-    );
-    const raw = BigInt(data);
-    return Number(raw) / 1e18;
-}
-/* TRC20 */
-async function checkTRON(address) {
-    const response = await fetch(
-        "https://api.trongrid.io/v1/accounts/" +
+
+
+/* BITCOIN */
+
+async function checkBTC(address) {
+
+    const data = await fetchJSON(
+        "https://blockstream.info/api/address/" +
         encodeURIComponent(address)
     );
-    if (!response.ok) {
-        throw Error("TRON HTTP " + response.status);
-    }
-    const data = await response.json();
+
+    const confirmed =
+        data.chain_stats.funded_txo_sum -
+        data.chain_stats.spent_txo_sum;
+
+    const pending =
+        data.mempool_stats.funded_txo_sum -
+        data.mempool_stats.spent_txo_sum;
+
+    const total = confirmed + pending;
+
+    return {
+
+        balance: total / 100000000,
+
+        transactions:
+            data.chain_stats.tx_count +
+            data.mempool_stats.tx_count
+
+    };
+}
+
+
+/* ETH / BNB NATIVE */
+
+async function checkNativeEVM(address, network) {
+
+    const balance = await rpc(
+        CONFIG[network].rpc,
+        "eth_getBalance",
+        [address, "latest"]
+    );
+
+    return formatUnits(balance, 18);
+}
+
+
+/* ERC20 / BEP20 USDT */
+
+async function checkEVMUSDT(address, network) {
+
+    const config = CONFIG[network];
+
+    const result = await rpc(
+
+        config.rpc,
+
+        "eth_call",
+
+        [{
+
+            to: config.usdt,
+
+            data: "0x70a08231" +
+                address.slice(2).toLowerCase()
+                .padStart(64, "0")
+
+        }, "latest"]
+
+    );
+
+    return formatUnits(
+        result,
+        config.decimals
+    );
+}
+
+
+/* TRON ACCOUNT */
+
+async function checkTRON(address) {
+
+    const data = await fetchJSON(
+
+        "https://api.trongrid.io/v1/accounts/" +
+        encodeURIComponent(address)
+
+    );
+
     if (!data.data || !data.data.length) {
-        return 0;
+
+        return {
+            trx: "0",
+            usdt: "0"
+        };
     }
+
     const account = data.data[0];
-    const tokens = account.trc20 || {};
-    let balance = 0;
+
+    const trx =
+        Number(account.balance || 0) / 1000000;
+
+    let usdt = "0";
+
+    const tokens = account.trc20 || [];
+
     for (const token of tokens) {
+
         if (
             Object.prototype.hasOwnProperty.call(
                 token,
-                TRON_CONTRACT
+                TRON_USDT
             )
         ) {
-            balance =
-                Number(token[TRON_CONTRACT]) / 1e6;
+
+            usdt = formatUnits(
+                token[TRON_USDT],
+                6
+            );
+
             break;
         }
     }
-    return balance;
+
+    return {
+        trx: String(trx),
+        usdt: usdt
+    };
 }
-/* Display */
+
+
+/* POSITIVE ASSETS */
+
+function addAsset(list, network, address, balance) {
+
+    if (Number(balance) > 0) {
+
+        list.push({
+
+            network: network,
+
+            address: address,
+
+            balance: String(balance),
+
+            date: new Date().toISOString()
+
+        });
+    }
+}
+
+
+/* CHECK ADDRESS */
+
+async function checkAddress(address) {
+
+    const found = [];
+
+    /* BTC */
+
+    if (validBTC(address)) {
+
+        try {
+
+            const data = await checkBTC(address);
+
+            addAsset(
+                found,
+                "BTC",
+                address,
+                data.balance
+            );
+
+        } catch(error) {
+
+            console.error("BTC:", error);
+        }
+
+        return found;
+    }
+
+
+    /* TRON */
+
+    if (validTRON(address)) {
+
+        try {
+
+            const data = await checkTRON(address);
+
+            addAsset(
+                found,
+                "TRX",
+                address,
+                data.trx
+            );
+
+            addAsset(
+                found,
+                "USDT-TRC20",
+                address,
+                data.usdt
+            );
+
+        } catch(error) {
+
+            console.error("TRON:", error);
+        }
+
+        return found;
+    }
+
+
+    /* ETH / BNB */
+
+    if (validEVM(address)) {
+
+        for (const network of ["ETH", "BNB"]) {
+
+            if (stopFlag) break;
+
+            try {
+
+                const native =
+                    await checkNativeEVM(
+                        address,
+                        network
+                    );
+
+                addAsset(
+                    found,
+                    network,
+                    address,
+                    native
+                );
+
+            } catch(error) {
+
+                console.error(network, error);
+            }
+
+            await sleep(300);
+
+            if (stopFlag) break;
+
+            try {
+
+                const usdt =
+                    await checkEVMUSDT(
+                        address,
+                        network
+                    );
+
+                addAsset(
+                    found,
+                    "USDT-" + network,
+                    address,
+                    usdt
+                );
+
+            } catch(error) {
+
+                console.error(
+                    "USDT " + network,
+                    error
+                );
+            }
+
+            await sleep(300);
+        }
+
+        return found;
+    }
+
+    return found;
+}
+
+
+/* DISPLAY */
+
 function render() {
+
     $("results").innerHTML = "";
+
     for (const item of [...results].reverse()) {
+
         const box = document.createElement("div");
+
         box.className = "result";
+
         const title = document.createElement("h3");
-        title.textContent = "USDT پیدا شد";
+
+        title.textContent = "دارایی پیدا شد";
+
         const network = document.createElement("p");
-        network.textContent = "شبکه: " + item.network;
+
+        network.textContent =
+            "شبکه: " + item.network;
+
         const address = document.createElement("p");
-        address.textContent = "آدرس: " + item.address;
+
+        address.textContent =
+            "آدرس: " + item.address;
+
         const balance = document.createElement("h3");
+
         balance.textContent =
-            "موجودی USDT: " + item.balance;
-        box.append(title, network, address, balance);
+            "موجودی: " + item.balance;
+
+        box.append(
+            title,
+            network,
+            address,
+            balance
+        );
+
         $("results").appendChild(box);
     }
 }
-/* Scanner */
+
+
+/* SCANNER */
+
 async function scan() {
-    stopped = false;
+
+    stopFlag = false;
+
     const addresses = $("addresses")
         .value
         .trim()
         .split(/\s+/)
         .filter(Boolean);
+
     if (!addresses.length) {
-        status("لطفاً آدرس کیف پول وارد کن.");
+
+        status("لطفاً آدرس وارد کن.");
+
         return;
     }
+
     let checked = 0;
+
     status("بررسی شروع شد...");
+
     for (const address of addresses) {
-        if (stopped) break;
-        const isTRON = validTRON(address);
-        const isEVM = validEVM(address);
-        if (!isTRON && !isEVM) {
-            status(
-                "آدرس نامعتبر:\n" + address
-            );
-            continue;
+
+        if (stopFlag) break;
+
+        status(
+            "آدرس در حال بررسی:\n" +
+            address +
+            "\nتعداد بررسی: " + checked
+        );
+
+        const found = await checkAddress(address);
+
+        checked++;
+
+        for (const item of found) {
+
+            results.push(item);
+
+            saveResults();
+
+            render();
         }
-        const networks = isTRON
-            ? ["TRC20"]
-            : ["ERC20", "BEP20"];
-        for (const network of networks) {
-            if (stopped) break;
-            checked++;
-            status(
-                "آدرس: " + address +
-                "\nشبکه: " + network +
-                "\nتعداد بررسی: " + checked
-            );
-            try {
-                let balance = 0;
-                if (network === "TRC20") {
-                    balance = await checkTRON(address);
-                } else {
-                    balance = await checkEVM(address, network);
-                }
-                if (balance > 0) {
-                    const item = {
-                        address,
-                        network,
-                        balance,
-                        date: new Date().toISOString()
-                    };
-                    results.push(item);
-                    save();
-                    render();
-                }
-            } catch(error) {
-                status(
-                    "خطا در بررسی " + network +
-                    "\n" + error.message
-                );
-            }
-            await sleep(500);
-        }
+
+        await sleep(500);
     }
-    if (stopped) {
-        status("بررسی متوقف شد.");
+
+    if (stopFlag) {
+
+        status(
+            "بررسی متوقف شد.\n" +
+            "تعداد آدرس بررسی شده: " +
+            checked
+        );
+
     } else {
+
         status(
             "بررسی پایان یافت.\n" +
-            "تعداد بررسی‌ها: " + checked
+            "تعداد آدرس بررسی شده: " +
+            checked +
+            "\nدارایی‌های مثبت: " +
+            results.length
         );
     }
 }
-/* Buttons */
+
+
+/* BUTTONS */
+
 $("start").onclick = scan;
+
 $("stop").onclick = () => {
-    stopped = true;
+
+    stopFlag = true;
+
     status("درخواست توقف ثبت شد.");
 };
+
+
 $("clear").onclick = () => {
+
     if (confirm("تمام نتایج پاک شود؟")) {
+
         results = [];
-        save();
+
+        saveResults();
+
         render();
+
         status("نتایج پاک شد.");
     }
 };
+
+
 /* CSV */
+
 $("csv").onclick = () => {
+
     const rows = [
-        ["Address", "Network", "USDT Balance", "Date"]
+
+        [
+            "Network",
+            "Address",
+            "Balance",
+            "Date"
+        ]
+
     ];
+
     for (const item of results) {
+
         rows.push([
-            item.address,
+
             item.network,
+
+            item.address,
+
             item.balance,
+
             item.date
+
         ]);
     }
+
     const csv = rows.map(row =>
+
         row.map(value =>
-            '"' + String(value).replaceAll('"', '""') + '"'
+
+            '"' +
+            String(value).replaceAll('"', '""') +
+            '"'
+
         ).join(",")
+
     ).join("\n");
+
+
     const blob = new Blob(
+
         ["\ufeff" + csv],
-        {type: "text/csv;charset=utf-8"}
+
+        {
+            type: "text/csv;charset=utf-8"
+        }
+
     );
+
     const url = URL.createObjectURL(blob);
+
     const link = document.createElement("a");
+
     link.href = url;
-    link.download = "usdt-results.csv";
+
+    link.download = "wallet-results.csv";
+
     link.click();
+
     URL.revokeObjectURL(url);
 };
+
+
+/* INITIALIZE */
+
 render();
+
 </script>
-</main>
+
 </body>
 </html>
