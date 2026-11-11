@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wallet Recovery Scanner V3</title>
+<title>Wallet Recovery Scanner</title>
 
 <style>
 body {
@@ -20,7 +20,7 @@ main {
     border-radius: 14px;
 }
 h2 { color: #1556b8; }
-textarea, input, button {
+textarea,input,button {
     width: 100%;
     box-sizing: border-box;
     padding: 12px;
@@ -28,9 +28,7 @@ textarea, input, button {
     border-radius: 8px;
     font-size: 15px;
 }
-textarea, input {
-    border: 1px solid #ccd3df;
-}
+textarea,input { border: 1px solid #ccd3df; }
 button {
     border: 0;
     background: #1556b8;
@@ -75,45 +73,40 @@ button {
 <body>
 <main>
 
-<h2>Wallet Recovery Scanner V3</h2>
+<h2>Wallet Recovery Scanner</h2>
 
-<p>
-بازیابی کیف پول با ۱۱ کلمه شناخته‌شده و بررسی شبکه‌های بلاک‌چین.
-</p>
+<p>بررسی عبارت‌های معتبر و نمایش دارایی‌های مثبت.</p>
 
 <div class="warning">
 <strong>هشدار امنیتی:</strong>
-عبارت بازیابی را در سایت عمومی وارد نکنید.
-این برنامه را فقط در محیط محلی و قابل اعتماد اجرا کنید.
-کتابخانه‌های رمزنگاری از CDN بارگیری می‌شوند و برای امنیت
-حداکثری باید فایل‌های وابستگی نیز بررسی شوند.
+عبارت بازیابی را در GitHub Pages عمومی وارد نکن.
+این برنامه از کتابخانه‌های خارجی و APIهای عمومی استفاده می‌کند.
+قبل از استفاده واقعی، با عبارت آزمایشی آن را بررسی کن.
 </div>
 
 <h3>۱. وارد کردن ۱۱ کلمه</h3>
 
 <textarea id="words" rows="4"
-placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کنید"></textarea>
+placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></textarea>
 
-<h3>۲. تعداد عبارت‌های معتبر در هر نوبت</h3>
+<h3>۲. تعداد عبارت معتبر در هر نوبت</h3>
 
 <input id="limit" type="number" value="5" min="1" max="100">
 
 <button id="start">شروع / ادامه اسکن</button>
 <button id="stop" class="stop">توقف اسکن</button>
 <button id="clear" class="clear">پاک کردن پیشرفت</button>
-<button id="csv" class="report">دانلود گزارش CSV</button>
+<button id="csv" class="report">دانلود گزارش</button>
 
-<h3>وضعیت اسکن</h3>
+<h3>وضعیت</h3>
 <div id="status" class="status">آماده شروع</div>
 
-<h3>نتایج</h3>
+<h3>دارایی‌های پیدا شده</h3>
 <div id="results"></div>
 
 <p class="small">
-این نسخه مسیر استاندارد اولین آدرس (Index 0) را بررسی می‌کند.
-کیف پول‌هایی که مسیر اختصاصی یا آدرس‌های بعدی دارند ممکن است
-در این بررسی پیدا نشوند. خطای API یا موجودی صفر نیز به معنای
-اشتباه بودن عبارت بازیابی نیست.
+این نسخه اولین آدرس استاندارد را بررسی می‌کند.
+آدرس‌های بعدی، مسیرهای سفارشی و تمام توکن‌ها هنوز بررسی نمی‌شوند.
 </p>
 
 </main>
@@ -157,7 +150,7 @@ let results = [];
 
 try {
     results = JSON.parse(
-        localStorage.getItem("wrs3_results") || "[]"
+        localStorage.getItem("wrs_results") || "[]"
     );
 } catch {
     results = [];
@@ -168,12 +161,12 @@ function status(text) {
 }
 
 function concat(...arrays) {
-    let length = arrays.reduce((n, a) => n + a.length, 0);
+    let length = arrays.reduce((n,a)=>n+a.length,0);
     let output = new Uint8Array(length);
     let offset = 0;
 
     for (const array of arrays) {
-        output.set(array, offset);
+        output.set(array,offset);
         offset += array.length;
     }
 
@@ -182,7 +175,7 @@ function concat(...arrays) {
 
 function hex(bytes) {
     return [...bytes]
-        .map(x => x.toString(16).padStart(2, "0"))
+        .map(x=>x.toString(16).padStart(2,"0"))
         .join("");
 }
 
@@ -193,7 +186,7 @@ function hash160(data) {
 function base58(data) {
 
     const alphabet =
-        "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
     let zeros = 0;
 
@@ -221,11 +214,11 @@ function base58(data) {
 function checksum(data) {
     return concat(
         data,
-        sha256(sha256(data)).slice(0, 4)
+        sha256(sha256(data)).slice(0,4)
     );
 }
 
-function base58check(version, payload) {
+function base58check(version,payload) {
     return base58(
         checksum(
             concat(
@@ -260,7 +253,7 @@ function polymod(values) {
             0x2a1462b3
         ];
 
-        for (let i = 0; i < 5; i++) {
+        for (let i=0;i<5;i++) {
             if ((top >>> i) & 1) {
                 c ^= generators[i];
             }
@@ -281,10 +274,10 @@ function hrpExpand(hrp) {
         low.push(value & 31);
     }
 
-    return [...high, 0, ...low];
+    return [...high,0,...low];
 }
 
-function convertBits(data, from, to, pad) {
+function convertBits(data,from,to,pad) {
 
     let accumulator = 0;
     let bits = 0;
@@ -295,80 +288,66 @@ function convertBits(data, from, to, pad) {
     for (const value of data) {
 
         if (value < 0 || (value >> from)) {
-            throw new Error("Invalid bit conversion");
+            throw Error("Invalid bit conversion");
         }
 
-        accumulator =
-            (accumulator << from) | value;
-
+        accumulator = (accumulator << from) | value;
         bits += from;
 
         while (bits >= to) {
             bits -= to;
-            output.push(
-                (accumulator >> bits) & maxValue
-            );
+            output.push((accumulator >> bits) & maxValue);
         }
     }
 
     if (pad) {
         if (bits) {
-            output.push(
-                (accumulator << (to - bits)) & maxValue
-            );
+            output.push((accumulator << (to-bits)) & maxValue);
         }
     } else if (
         bits >= from ||
-        ((accumulator << (to - bits)) & maxValue)
+        ((accumulator << (to-bits)) & maxValue)
     ) {
-        throw new Error("Invalid padding");
+        throw Error("Invalid padding");
     }
 
     return output;
 }
 
-function bech32(hrp, version, program) {
+function bech32(hrp,version,program) {
 
     const data = [
         version,
-        ...convertBits(program, 8, 5, true)
+        ...convertBits(program,8,5,true)
     ];
 
     const values = [
         ...hrpExpand(hrp),
         ...data,
-        0, 0, 0, 0, 0, 0
+        0,0,0,0,0,0
     ];
 
     const mod = polymod(values) ^ 1;
 
-    let checksumValues = [];
+    let cs = [];
 
-    for (let i = 0; i < 6; i++) {
-        checksumValues.push(
-            (mod >>> (5 * (5 - i))) & 31
-        );
+    for (let i=0;i<6;i++) {
+        cs.push((mod >>> (5*(5-i))) & 31);
     }
 
     return hrp + "1" +
-        [...data, ...checksumValues]
-        .map(x => BECH32[x])
+        [...data,...cs]
+        .map(x=>BECH32[x])
         .join("");
 }
 
 
 /* Derivation */
 
-function deriveNode(seed, path) {
+function getPublicKey(seed,path,compressed=true) {
 
     const root = HDKey.fromMasterSeed(seed);
-
-    return root.derive(path);
-}
-
-function getPublicKey(seed, path, compressed = true) {
-
-    const node = deriveNode(seed, path);
+    const node = root.derive(path);
 
     return secp256k1.getPublicKey(
         node.privateKey,
@@ -377,76 +356,65 @@ function getPublicKey(seed, path, compressed = true) {
 }
 
 
-/* Bitcoin addresses */
+/* Bitcoin */
 
 function bitcoinAddresses(seed) {
 
     const legacyPub = getPublicKey(
         seed,
-        "m/44'/0'/0'/0/0",
-        true
+        "m/44'/0'/0'/0/0"
     );
 
     const nestedPub = getPublicKey(
         seed,
-        "m/49'/0'/0'/0/0",
-        true
+        "m/49'/0'/0'/0/0"
     );
 
     const nativePub = getPublicKey(
         seed,
-        "m/84'/0'/0'/0/0",
-        true
-    );
-
-    const legacy = base58check(
-        0,
-        hash160(legacyPub)
-    );
-
-    const redeemScript = concat(
-        new Uint8Array([0, 20]),
-        hash160(nestedPub)
-    );
-
-    const nested = base58check(
-        5,
-        hash160(redeemScript)
-    );
-
-    const native = bech32(
-        "bc",
-        0,
-        hash160(nativePub)
+        "m/84'/0'/0'/0/0"
     );
 
     return {
-        BTC_Legacy: legacy,
-        BTC_NestedSegWit: nested,
-        BTC_NativeSegWit: native
+
+        BTC_Legacy:
+        base58check(0,hash160(legacyPub)),
+
+        BTC_NestedSegWit:
+        base58check(
+            5,
+            hash160(
+                concat(
+                    new Uint8Array([0,20]),
+                    hash160(nestedPub)
+                )
+            )
+        ),
+
+        BTC_NativeSegWit:
+        bech32("bc",0,hash160(nativePub))
+
     };
 }
 
 
-/* Ethereum / BNB */
+/* Ethereum and BNB */
 
-function evmAddress(seed, coinType) {
+function evmAddress(seed) {
 
     const publicKey = getPublicKey(
         seed,
-        `m/44'/${coinType}'/0'/0/0`,
+        "m/44'/60'/0'/0/0",
         false
     );
 
-    const hash = keccak_256(
-        publicKey.slice(1)
-    );
+    const hash = keccak_256(publicKey.slice(1));
 
     return "0x" + hex(hash.slice(-20));
 }
 
 
-/* Tron */
+/* TRON */
 
 function tronAddress(seed) {
 
@@ -456,9 +424,7 @@ function tronAddress(seed) {
         false
     );
 
-    const hash = keccak_256(
-        publicKey.slice(1)
-    );
+    const hash = keccak_256(publicKey.slice(1));
 
     const payload = concat(
         new Uint8Array([0x41]),
@@ -469,26 +435,26 @@ function tronAddress(seed) {
 }
 
 
-/* Network requests */
+/* Network APIs */
 
-async function fetchJSON(url, options = {}) {
+async function fetchJSON(url,options={}) {
 
     const controller = new AbortController();
 
     const timeout = setTimeout(
-        () => controller.abort(),
+        ()=>controller.abort(),
         15000
     );
 
     try {
 
-        const response = await fetch(url, {
+        const response = await fetch(url,{
             ...options,
-            signal: controller.signal
+            signal:controller.signal
         });
 
         if (!response.ok) {
-            throw new Error("HTTP " + response.status);
+            throw Error("HTTP "+response.status);
         }
 
         return await response.json();
@@ -499,12 +465,12 @@ async function fetchJSON(url, options = {}) {
 }
 
 
-/* Bitcoin balance and transaction count */
+/* BTC */
 
 async function checkBTC(address) {
 
     const data = await fetchJSON(
-        "https://blockstream.info/api/address/" +
+        "https://blockstream.info/api/address/"+
         encodeURIComponent(address)
     );
 
@@ -517,59 +483,54 @@ async function checkBTC(address) {
         data.mempool_stats.spent_txo_sum;
 
     return {
-        balance_satoshis: confirmed + unconfirmed,
-        balance_BTC: (confirmed + unconfirmed) / 100000000,
+
+        balance_satoshis:confirmed+unconfirmed,
+
+        balance_BTC:
+        (confirmed+unconfirmed)/100000000,
+
         transaction_count:
-            data.chain_stats.tx_count +
-            data.mempool_stats.tx_count
+        data.chain_stats.tx_count+
+        data.mempool_stats.tx_count
+
     };
 }
 
 
-/* Ethereum and BNB RPC */
+/* ETH / BNB */
 
-async function rpc(url, method, params) {
+async function rpc(url,method,params) {
 
-    const data = await fetchJSON(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
+    const data = await fetchJSON(url,{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
         },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
+        body:JSON.stringify({
+            jsonrpc:"2.0",
+            id:1,
             method,
             params
         })
     });
 
     if (data.error) {
-        throw new Error(
-            data.error.message || "RPC error"
-        );
+        throw Error(data.error.message || "RPC error");
     }
 
     return data.result;
 }
 
-async function checkEVM(url, address) {
+async function checkEVM(url,address) {
 
     const balance = await rpc(
         url,
         "eth_getBalance",
-        [address, "latest"]
-    );
-
-    const nonce = await rpc(
-        url,
-        "eth_getTransactionCount",
-        [address, "latest"]
+        [address,"latest"]
     );
 
     return {
-        balance_wei: BigInt(balance).toString(),
-        transaction_nonce: parseInt(nonce, 16),
-        note: "Nonce فقط تعداد تراکنش‌های خروجی را نشان می‌دهد، نه تمام تاریخچه."
+        balance_wei:BigInt(balance).toString()
     };
 }
 
@@ -579,7 +540,7 @@ async function checkEVM(url, address) {
 async function checkTRON(address) {
 
     const account = await fetchJSON(
-        "https://api.trongrid.io/v1/accounts/" +
+        "https://api.trongrid.io/v1/accounts/"+
         encodeURIComponent(address)
     );
 
@@ -589,29 +550,88 @@ async function checkTRON(address) {
         : null;
 
     return {
-        balance_sun: data ? data.balance : 0,
-        balance_TRX:
-            data ? data.balance / 1000000 : 0,
-        account_found: !!data,
-        note: "برای تاریخچه کامل تراکنش‌های TRON بررسی جداگانه لازم است."
+        balance_sun:data ? data.balance : 0,
+        balance_TRX:data ? data.balance/1000000 : 0
     };
 }
 
 
-/* Save progress */
+/* Positive assets only */
+
+function getPositiveAssets(result) {
+
+    const positive = {};
+
+    for (const [network,data] of Object.entries(result.checks)) {
+
+        if (!data || data.error) continue;
+
+        if (network.startsWith("BTC_")) {
+
+            const balance = Number(
+                data.balance_satoshis || 0
+            );
+
+            if (balance > 0) {
+
+                positive[network] = {
+                    address:result.addresses[network],
+                    balance_BTC:data.balance_BTC
+                };
+            }
+        }
+
+        if (network === "ETH" || network === "BNB") {
+
+            const balance = BigInt(
+                data.balance_wei || "0"
+            );
+
+            if (balance > 0n) {
+
+                positive[network] = {
+                    address:result.addresses[network],
+                    balance_wei:balance.toString(),
+                    balance_native:
+                    Number(balance)/1e18
+                };
+            }
+        }
+
+        if (network === "TRON") {
+
+            const balance = Number(
+                data.balance_sun || 0
+            );
+
+            if (balance > 0) {
+
+                positive[network] = {
+                    address:result.addresses[network],
+                    balance_TRX:data.balance_TRX
+                };
+            }
+        }
+    }
+
+    return positive;
+}
+
+
+/* Save and resume */
 
 function getCursor() {
 
     try {
         return JSON.parse(
-            localStorage.getItem("wrs3_cursor") ||
+            localStorage.getItem("wrs_cursor") ||
             '{"position":0,"index":0,"valid":0}'
         );
     } catch {
         return {
-            position: 0,
-            index: 0,
-            valid: 0
+            position:0,
+            index:0,
+            valid:0
         };
     }
 }
@@ -619,7 +639,7 @@ function getCursor() {
 function saveCursor(cursor) {
 
     localStorage.setItem(
-        "wrs3_cursor",
+        "wrs_cursor",
         JSON.stringify(cursor)
     );
 }
@@ -627,41 +647,92 @@ function saveCursor(cursor) {
 function saveResults() {
 
     localStorage.setItem(
-        "wrs3_results",
+        "wrs_results",
         JSON.stringify(results)
     );
 }
 
 
-/* Display */
+/* Display positive results */
 
 function render() {
 
     $("results").innerHTML = "";
 
-    for (
-        const item of results.slice(-30).reverse()
-    ) {
+    for (const item of results.slice().reverse()) {
 
         const box = document.createElement("div");
-
         box.className = "result";
 
-        box.textContent = JSON.stringify(
-            item,
-            null,
-            2
-        );
+        const title = document.createElement("h3");
+        title.textContent = "دارایی پیدا شد";
+
+        const word = document.createElement("p");
+        word.textContent =
+            "کلمه گمشده: " + item.missing_word;
+
+        const position = document.createElement("p");
+        position.textContent =
+            "جایگاه کلمه: " + item.missing_position;
+
+        box.appendChild(title);
+        box.appendChild(word);
+        box.appendChild(position);
+
+        for (
+            const [network,asset]
+            of Object.entries(item.assets)
+        ) {
+
+            const section = document.createElement("div");
+
+            section.style.borderTop = "1px solid #ddd";
+            section.style.paddingTop = "8px";
+
+            const name = document.createElement("h4");
+            name.textContent = network;
+
+            const address = document.createElement("p");
+            address.textContent = "آدرس: " + asset.address;
+
+            const balance = document.createElement("p");
+
+            if (network.startsWith("BTC_")) {
+                balance.textContent =
+                    "موجودی BTC: " + asset.balance_BTC;
+            }
+
+            if (network === "ETH") {
+                balance.textContent =
+                    "موجودی ETH: " + asset.balance_native;
+            }
+
+            if (network === "BNB") {
+                balance.textContent =
+                    "موجودی BNB: " + asset.balance_native;
+            }
+
+            if (network === "TRON") {
+                balance.textContent =
+                    "موجودی TRX: " + asset.balance_TRX;
+            }
+
+            section.appendChild(name);
+            section.appendChild(address);
+            section.appendChild(balance);
+
+            box.appendChild(section);
+        }
 
         $("results").appendChild(box);
     }
 }
 
 
-/* Main scanner */
+/* Scanner */
 
 const sleep = ms =>
-    new Promise(resolve => setTimeout(resolve, ms));
+    new Promise(resolve=>setTimeout(resolve,ms));
 
 
 async function scan() {
@@ -676,14 +747,12 @@ async function scan() {
         .filter(Boolean);
 
     if (words.length !== 11) {
-        status("خطا: دقیقاً ۱۱ کلمه وارد کنید.");
+        status("خطا: دقیقاً ۱۱ کلمه وارد کن.");
         return;
     }
 
-    if (words.some(word => !wordlist.includes(word))) {
-        status(
-            "خطا: یک یا چند کلمه در فهرست استاندارد BIP39 نیست."
-        );
+    if (words.some(word=>!wordlist.includes(word))) {
+        status("خطا: یک یا چند کلمه در فهرست BIP39 نیست.");
         return;
     }
 
@@ -691,10 +760,10 @@ async function scan() {
 
     const limit = Math.max(
         1,
-        Math.min(100, Number($("limit").value) || 5)
+        Math.min(100,Number($("limit").value)||5)
     );
 
-    let checkedThisRun = 0;
+    let checked = 0;
 
     status("اسکن شروع شد...");
 
@@ -702,7 +771,7 @@ async function scan() {
 
         while (
             cursor.position < 12 &&
-            checkedThisRun < limit &&
+            checked < limit &&
             !stopFlag
         ) {
 
@@ -712,7 +781,6 @@ async function scan() {
                 cursor.index = 0;
 
                 saveCursor(cursor);
-
                 continue;
             }
 
@@ -732,27 +800,20 @@ async function scan() {
                     wordlist
                 )
             ) {
-
                 saveCursor(cursor);
-
                 continue;
             }
 
             cursor.valid++;
-            checkedThisRun++;
+            checked++;
 
             saveCursor(cursor);
 
             status(
-                "عبارت معتبر شماره: " + cursor.valid +
-                "\nجایگاه: " + (cursor.position + 1) +
-                "\nدر حال ساخت آدرس‌ها و بررسی شبکه‌ها..."
+                "عبارت معتبر شماره: "+cursor.valid+
+                "\nجایگاه در حال بررسی: "+(cursor.position+1)+
+                "\nدر حال بررسی شبکه‌ها..."
             );
-
-            /*
-             * عبارت کامل فقط در حافظه استفاده می‌شود.
-             * عبارت و کلید خصوصی ذخیره یا نمایش داده نمی‌شوند.
-             */
 
             const mnemonic = candidate.join(" ");
 
@@ -762,140 +823,134 @@ async function scan() {
 
                 ...bitcoinAddresses(seed),
 
-                ETH: evmAddress(seed, 60),
+                ETH:evmAddress(seed),
 
-                BNB: evmAddress(seed, 60),
+                BNB:evmAddress(seed),
 
-                TRON: tronAddress(seed)
+                TRON:tronAddress(seed)
 
             };
 
             const result = {
-
-                candidate_number: cursor.valid,
-
-                addresses: addresses,
-
-                checks: {},
-
-                checked_at: new Date().toISOString()
-
+                addresses,
+                checks:{}
             };
 
 
-            /* Check Bitcoin addresses */
+            /* BTC */
 
-            for (
-                const name of [
-                    "BTC_Legacy",
-                    "BTC_NestedSegWit",
-                    "BTC_NativeSegWit"
-                ]
-            ) {
+            for (const network of [
+                "BTC_Legacy",
+                "BTC_NestedSegWit",
+                "BTC_NativeSegWit"
+            ]) {
 
                 if (stopFlag) break;
 
                 try {
-
-                    result.checks[name] =
-                        await checkBTC(addresses[name]);
-
-                } catch (error) {
-
-                    result.checks[name] = {
-                        error: String(error.message || error)
+                    result.checks[network] =
+                        await checkBTC(addresses[network]);
+                } catch(error) {
+                    result.checks[network] = {
+                        error:String(error.message||error)
                     };
-
                 }
 
                 await sleep(500);
             }
 
 
-            /* Check Ethereum */
+            /* ETH */
 
             if (!stopFlag) {
 
                 try {
-
                     result.checks.ETH =
                         await checkEVM(
                             "https://ethereum-rpc.publicnode.com",
                             addresses.ETH
                         );
-
-                } catch (error) {
-
+                } catch(error) {
                     result.checks.ETH = {
-                        error: String(error.message || error)
+                        error:String(error.message||error)
                     };
-
                 }
 
                 await sleep(500);
             }
 
 
-            /* Check BNB Smart Chain */
+            /* BNB */
 
             if (!stopFlag) {
 
                 try {
-
                     result.checks.BNB =
                         await checkEVM(
                             "https://bsc-rpc.publicnode.com",
                             addresses.BNB
                         );
-
-                } catch (error) {
-
+                } catch(error) {
                     result.checks.BNB = {
-                        error: String(error.message || error)
+                        error:String(error.message||error)
                     };
-
                 }
 
                 await sleep(500);
             }
 
 
-            /* Check TRON */
+            /* TRON */
 
             if (!stopFlag) {
 
                 try {
-
                     result.checks.TRON =
                         await checkTRON(addresses.TRON);
-
-                } catch (error) {
-
+                } catch(error) {
                     result.checks.TRON = {
-                        error: String(error.message || error)
+                        error:String(error.message||error)
                     };
-
                 }
             }
 
 
-            results.push(result);
+            /* Save only positive assets */
 
-            saveResults();
+            const assets = getPositiveAssets(result);
 
-            render();
+            if (Object.keys(assets).length > 0) {
+
+                const found = {
+
+                    missing_word:
+                    candidate[cursor.position],
+
+                    missing_position:
+                    cursor.position+1,
+
+                    assets:assets,
+
+                    found_at:
+                    new Date().toISOString()
+
+                };
+
+                results.push(found);
+
+                saveResults();
+
+                render();
+
+                status(
+                    "دارایی پیدا شد!\n"+
+                    "کلمه گمشده: "+found.missing_word+
+                    "\nجایگاه کلمه: "+found.missing_position
+                );
+
+            }
 
             candidate.fill("");
-
-            status(
-                "اسکن ادامه دارد.\n" +
-                "جایگاه فعلی: " + (cursor.position + 1) +
-                " از ۱۲\n" +
-                "شماره کلمه: " + cursor.index +
-                " از ۲۰۴۸\n" +
-                "عبارت معتبر بررسی‌شده: " + cursor.valid +
-                "\nاین نوبت: " + checkedThisRun
-            );
 
             await sleep(500);
         }
@@ -903,32 +958,27 @@ async function scan() {
 
         if (cursor.position >= 12) {
 
-            status(
-                "اسکن تمام ۱۲ جایگاه به پایان رسید."
-            );
+            status("بررسی تمام جایگاه‌ها پایان یافت.");
 
         } else if (stopFlag) {
 
-            status(
-                "اسکن متوقف شد. پیشرفت ذخیره شده است."
-            );
+            status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
 
         } else {
 
             status(
-                "این نوبت تمام شد.\n" +
-                checkedThisRun +
-                " عبارت معتبر بررسی شد.\n" +
-                "برای ادامه دوباره دکمه شروع را بزنید."
+                "این نوبت تمام شد.\n"+
+                checked+
+                " عبارت معتبر بررسی شد.\n"+
+                "برای ادامه دوباره شروع را بزن."
             );
         }
 
-    } catch (error) {
+    } catch(error) {
 
         status(
-            "خطا: " +
-            String(error.message || error) +
-            "\nپیشرفت قبلی ذخیره شده است."
+            "خطا: "+String(error.message||error)+
+            "\nپیشرفت ذخیره شده است."
         );
 
     }
@@ -940,85 +990,69 @@ async function scan() {
 $("start").onclick = scan;
 
 $("stop").onclick = () => {
-
     stopFlag = true;
-
-    status(
-        "درخواست توقف ثبت شد. پس از پایان درخواست فعلی متوقف می‌شود."
-    );
-
+    status("درخواست توقف ثبت شد.");
 };
-
 
 $("clear").onclick = () => {
 
-    if (
-        confirm(
-            "آیا مطمئن هستید پیشرفت و گزارش‌ها پاک شود؟"
-        )
-    ) {
+    if (confirm("پیشرفت و گزارش‌ها پاک شود؟")) {
 
-        localStorage.removeItem("wrs3_cursor");
-
-        localStorage.removeItem("wrs3_results");
+        localStorage.removeItem("wrs_cursor");
+        localStorage.removeItem("wrs_results");
 
         results = [];
 
         render();
 
         status("پیشرفت پاک شد.");
-
     }
-
 };
 
 
-/* CSV report */
+/* CSV */
 
 $("csv").onclick = () => {
 
     const rows = [
-        [
-            "Candidate",
-            "Network",
-            "Address",
-            "Result"
-        ]
+        ["Missing Word","Position","Network","Address","Balance"]
     ];
 
     for (const item of results) {
 
-        for (
-            const [network, address]
-            of Object.entries(item.addresses)
-        ) {
+        for (const [network,asset] of Object.entries(item.assets)) {
+
+            let balance = "";
+
+            if (network.startsWith("BTC_")) {
+                balance = asset.balance_BTC;
+            } else if (network === "ETH") {
+                balance = asset.balance_native;
+            } else if (network === "BNB") {
+                balance = asset.balance_native;
+            } else if (network === "TRON") {
+                balance = asset.balance_TRX;
+            }
 
             rows.push([
-                item.candidate_number,
+                item.missing_word,
+                item.missing_position,
                 network,
-                address,
-                JSON.stringify(
-                    item.checks[network] || {}
-                )
+                asset.address,
+                balance
             ]);
-
         }
-
     }
 
     const csv = rows.map(row =>
         row.map(value =>
-            '"' +
-            String(value).replaceAll('"', '""') +
-            '"'
+            '"' + String(value).replaceAll('"','""') + '"'
         ).join(",")
     ).join("\n");
 
     const blob = new Blob(
-        ["\ufeff" + csv],
-        {
-            type: "text/csv;charset=utf-8"
-        }
+        ["\ufeff"+csv],
+        {type:"text/csv;charset=utf-8"}
     );
 
     const url = URL.createObjectURL(blob);
@@ -1026,19 +1060,15 @@ $("csv").onclick = () => {
     const link = document.createElement("a");
 
     link.href = url;
-
-    link.download = "wallet-recovery-report.csv";
-
+    link.download = "wallet-positive-results.csv";
     link.click();
 
     URL.revokeObjectURL(url);
-
 };
 
 
 render();
 
 </script>
-
 </body>
 </html>
