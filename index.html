@@ -1,33 +1,1044 @@
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wallet Recovery Scanner v2</title><style>
-*{box-sizing:border-box}body{margin:0;padding:16px;background:#10151d;color:#eef3f8;font:16px/1.8 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:760px;margin:auto}.card{background:#1a2430;border:1px solid #39495a;border-radius:14px;padding:16px;margin:12px 0}h1{font-size:23px;margin:0 0 8px}h2{font-size:18px;margin:0 0 8px}.muted{color:#b5c2cf;font-size:14px}.warning{border-right:4px solid #e3aa39}.danger{color:#ffb3b3}textarea{width:100%;min-height:110px;background:#0d131b;color:white;border:1px solid #526477;border-radius:10px;padding:12px;direction:ltr;text-align:left;font-size:16px}button{border:0;border-radius:9px;padding:12px 15px;background:#238636;color:white;font-weight:700;font-size:15px;margin:8px 4px 0 0}button.secondary{background:#344252}button.stop{background:#9b3434}button:disabled{opacity:.45}progress{width:100%;height:18px}pre{direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;background:#0d131b;border-radius:9px;padding:12px;min-height:60px}
-</style></head><body><main>
-<section class="card"><h1>Wallet Recovery Scanner</h1><div class="muted">اسکن محلی عبارت ۱۲ کلمه‌ای BIP39 انگلیسی — نسخه با ذخیره مرحله</div></section>
-<section class="card warning"><b>امنیت و محدودیت‌ها</b><p class="muted">این فایل را دانلود و محلی در دستگاه خودت باز کن؛ عبارت بازیابی را در GitHub Pages وارد نکن. کلمات به سرور ارسال نمی‌شوند. فهرست استاندارد BIP39 در شروع از اینترنت دریافت می‌شود.</p><p class="muted danger">این نسخه فقط عبارت‌های معتبر BIP39 را پیدا می‌کند؛ هنوز آدرس و موجودی BTC/ETH/BNB/TRON را بررسی نمی‌کند. نتیجه معتبر BIP39 الزاماً کیف پول اصلی نیست.</p></section>
-<section class="card"><h2>۱) یازده کلمه شناخته‌شده</h2><label for="words">۱۱ کلمه را به ترتیب اصلی وارد کن؛ آن‌ها را برای هیچ‌کس ارسال نکن.</label><textarea id="words" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="eleven English words separated by spaces"></textarea><button id="start">شروع / ادامه اسکن</button><button id="pause" class="stop" disabled>توقف</button><button id="reset" class="secondary">پاک‌کردن پیشرفت</button><p id="status" class="muted" aria-live="polite">آماده</p><progress id="bar" max="24576" value="0"></progress><p id="counts" class="muted">۰ از ۲۴٬۵۷۶ حالت</p></section>
-<section class="card"><h2>۲) نتیجه</h2><p class="muted">نتایج فقط در همین صفحه نمایش داده می‌شوند و در حافظه دائمی ذخیره نمی‌شوند.</p><pre id="out">هنوز نتیجه‌ای وجود ندارد.</pre></section>
-</main><script>
-"use strict";
-const URL_WORDS="https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt",DB="wallet-recovery-progress-v2",STORE="progress",TOTAL=24576,$=id=>document.getElementById(id);
-let stopping=false,running=false,found=[];
-function dbOpen(){return new Promise((ok,no)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
-async function getP(){let d=await dbOpen();return new Promise((ok,no)=>{let r=d.transaction(STORE).objectStore(STORE).get("p");r.onsuccess=()=>ok(r.result||{pos:0,idx:0,done:0});r.onerror=()=>no(r.error)})}
-async function saveP(p){let d=await dbOpen();return new Promise((ok,no)=>{let t=d.transaction(STORE,"readwrite");t.objectStore(STORE).put(p,"p");t.oncomplete=ok;t.onerror=()=>no(t.error)})}
-async function clearP(){let d=await dbOpen();return new Promise((ok,no)=>{let t=d.transaction(STORE,"readwrite");t.objectStore(STORE).clear();t.oncomplete=ok;t.onerror=()=>no(t.error)})}
-const bits=b=>Array.from(b,x=>x.toString(2).padStart(8,"0")).join("");
-async function valid(ws,map){let s=ws.map(w=>map.get(w).toString(2).padStart(11,"0")).join(""),e=s.slice(0,128),c=s.slice(128),b=new Uint8Array(16);for(let i=0;i<16;i++)b[i]=parseInt(e.slice(i*8,i*8+8),2);let h=new Uint8Array(await crypto.subtle.digest("SHA-256",b));return c===bits(h).slice(0,4)}
-function progress(p){$("bar").value=p.done;$("counts").textContent=`${p.done.toLocaleString("en-US")} از ${TOTAL.toLocaleString("en-US")} حالت بررسی شده | موقعیت ${Math.min(12,p.pos+1)} از ۱۲`}
-$("start").onclick=async()=>{if(running)return;running=true;stopping=false;$("start").disabled=true;$("pause").disabled=false;try{
-if(!crypto.subtle||!indexedDB)throw Error("Safari به‌روز با Web Crypto و IndexedDB لازم است.");
-let known=$("words").value.trim().toLowerCase().split(/\s+/).filter(Boolean);if(known.length!==11)throw Error("دقیقاً ۱۱ کلمه لازم است.");
-$("status").textContent="دریافت فهرست BIP39…";let res=await fetch(URL_WORDS);if(!res.ok)throw Error("فهرست کلمات دریافت نشد؛ اینترنت را بررسی کن.");let list=(await res.text()).trim().split(/\r?\n/);if(list.length!==2048)throw Error("فهرست BIP39 نامعتبر است.");let map=new Map(list.map((w,i)=>[w,i])),bad=known.filter(w=>!map.has(w));if(bad.length)throw Error("کلمه خارج از فهرست انگلیسی BIP39: "+bad.join(", "));
-let p=await getP();if(p.pos>=12)throw Error("اسکن قبلی کامل است؛ برای شروع تازه پیشرفت را پاک کن.");progress(p);
-for(let pos=p.pos;pos<12;pos++){for(let idx=(pos===p.pos?p.idx:0);idx<2048;idx++){if(stopping){p={pos,idx,done:p.done};await saveP(p);progress(p);$("status").textContent="متوقف شد؛ پیشرفت ذخیره شد. برای ادامه همان ۱۱ کلمه را دوباره وارد کن.";return}
-let phrase=known.slice();phrase.splice(pos,0,list[idx]);if(await valid(phrase,map)){found.push(`موقعیت ${pos+1} | کلمه احتمالی: ${list[idx]}`);$("out").textContent=found.join("\n")}
-p={pos,idx:idx+1,done:p.done+1};if(p.done%32===0){await saveP(p);progress(p);$("status").textContent=`در حال بررسی موقعیت ${pos+1} از ۱۲…`;await new Promise(r=>setTimeout(r,0))}
-}p={pos:pos+1,idx:0,done:p.done};await saveP(p);progress(p)}
-$("status").textContent="اسکن کامل شد. عبارت‌های معتبر در بخش نتیجه دیده می‌شوند.";
-}catch(e){$("status").textContent="خطا: "+e.message}finally{running=false;$("start").disabled=false;$("pause").disabled=true}};
-$("pause").onclick=()=>{stopping=true;$("pause").disabled=true;$("status").textContent="درخواست توقف ثبت شد…"};
-$("reset").onclick=async()=>{if(running)return;await clearP();found=[];$("out").textContent="نتیجه پاک شد.";$("bar").value=0;$("counts").textContent=`۰ از ${TOTAL.toLocaleString("en-US")} حالت`;$("status").textContent="پیشرفت پاک شد."};
-(async()=>{try{let p=await getP();progress(p);if(p.done)$("status").textContent="پیشرفت قبلی موجود است؛ برای ادامه همان ۱۱ کلمه را دوباره وارد کن."}catch(e){}})();
-</script></body></html>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet Recovery Scanner V3</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f1f4f9;
+    color: #172033;
+    padding: 15px;
+}
+main {
+    max-width: 750px;
+    margin: auto;
+    background: white;
+    padding: 18px;
+    border-radius: 14px;
+}
+h2 { color: #1556b8; }
+textarea, input, button {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    margin: 7px 0;
+    border-radius: 8px;
+    font-size: 15px;
+}
+textarea, input {
+    border: 1px solid #ccd3df;
+}
+button {
+    border: 0;
+    background: #1556b8;
+    color: white;
+    font-weight: bold;
+}
+.stop { background: #a52a2a; }
+.clear { background: #555; }
+.report { background: #16834a; }
+.warning {
+    background: #fff1d0;
+    color: #674800;
+    padding: 12px;
+    border-radius: 8px;
+    line-height: 1.8;
+}
+.status {
+    background: #edf2fa;
+    padding: 12px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    line-height: 1.8;
+}
+.result {
+    background: #f8f9fc;
+    border: 1px solid #d5dce8;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+    direction: ltr;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+.small {
+    font-size: 13px;
+    color: #667085;
+    line-height: 1.7;
+}
+</style>
+</head>
+
+<body>
+<main>
+
+<h2>Wallet Recovery Scanner V3</h2>
+
+<p>
+بازیابی کیف پول با ۱۱ کلمه شناخته‌شده و بررسی شبکه‌های بلاک‌چین.
+</p>
+
+<div class="warning">
+<strong>هشدار امنیتی:</strong>
+عبارت بازیابی را در سایت عمومی وارد نکنید.
+این برنامه را فقط در محیط محلی و قابل اعتماد اجرا کنید.
+کتابخانه‌های رمزنگاری از CDN بارگیری می‌شوند و برای امنیت
+حداکثری باید فایل‌های وابستگی نیز بررسی شوند.
+</div>
+
+<h3>۱. وارد کردن ۱۱ کلمه</h3>
+
+<textarea id="words" rows="4"
+placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کنید"></textarea>
+
+<h3>۲. تعداد عبارت‌های معتبر در هر نوبت</h3>
+
+<input id="limit" type="number" value="5" min="1" max="100">
+
+<button id="start">شروع / ادامه اسکن</button>
+<button id="stop" class="stop">توقف اسکن</button>
+<button id="clear" class="clear">پاک کردن پیشرفت</button>
+<button id="csv" class="report">دانلود گزارش CSV</button>
+
+<h3>وضعیت اسکن</h3>
+<div id="status" class="status">آماده شروع</div>
+
+<h3>نتایج</h3>
+<div id="results"></div>
+
+<p class="small">
+این نسخه مسیر استاندارد اولین آدرس (Index 0) را بررسی می‌کند.
+کیف پول‌هایی که مسیر اختصاصی یا آدرس‌های بعدی دارند ممکن است
+در این بررسی پیدا نشوند. خطای API یا موجودی صفر نیز به معنای
+اشتباه بودن عبارت بازیابی نیست.
+</p>
+
+</main>
+
+<script type="module">
+
+import {
+    validateMnemonic,
+    mnemonicToSeedSync
+} from "https://esm.sh/@scure/bip39@1.6.0";
+
+import {
+    wordlist
+} from "https://esm.sh/@scure/bip39@1.6.0/wordlists/english.js";
+
+import {
+    HDKey
+} from "https://esm.sh/@scure/bip32@1.6.0";
+
+import {
+    sha256
+} from "https://esm.sh/@noble/hashes@1.5.0/sha256";
+
+import {
+    ripemd160
+} from "https://esm.sh/@noble/hashes@1.5.0/ripemd160";
+
+import {
+    keccak_256
+} from "https://esm.sh/@noble/hashes@1.5.0/sha3";
+
+import {
+    secp256k1
+} from "https://esm.sh/@noble/curves@1.4.0/secp256k1";
+
+
+const $ = id => document.getElementById(id);
+
+let stopFlag = false;
+let results = [];
+
+try {
+    results = JSON.parse(
+        localStorage.getItem("wrs3_results") || "[]"
+    );
+} catch {
+    results = [];
+}
+
+function status(text) {
+    $("status").textContent = text;
+}
+
+function concat(...arrays) {
+    let length = arrays.reduce((n, a) => n + a.length, 0);
+    let output = new Uint8Array(length);
+    let offset = 0;
+
+    for (const array of arrays) {
+        output.set(array, offset);
+        offset += array.length;
+    }
+
+    return output;
+}
+
+function hex(bytes) {
+    return [...bytes]
+        .map(x => x.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+function hash160(data) {
+    return ripemd160(sha256(data));
+}
+
+function base58(data) {
+
+    const alphabet =
+        "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    let zeros = 0;
+
+    while (zeros < data.length && data[zeros] === 0) {
+        zeros++;
+    }
+
+    let number = 0n;
+
+    for (const byte of data) {
+        number = number * 256n + BigInt(byte);
+    }
+
+    let output = "";
+
+    while (number > 0n) {
+        let remainder = Number(number % 58n);
+        output = alphabet[remainder] + output;
+        number /= 58n;
+    }
+
+    return "1".repeat(zeros) + output;
+}
+
+function checksum(data) {
+    return concat(
+        data,
+        sha256(sha256(data)).slice(0, 4)
+    );
+}
+
+function base58check(version, payload) {
+    return base58(
+        checksum(
+            concat(
+                new Uint8Array([version]),
+                payload
+            )
+        )
+    );
+}
+
+
+/* Bitcoin Bech32 */
+
+const BECH32 =
+"qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+function polymod(values) {
+
+    let c = 1;
+
+    for (const value of values) {
+
+        let top = c >>> 25;
+
+        c = ((c & 0x1ffffff) << 5) ^ value;
+
+        const generators = [
+            0x3b6a57b2,
+            0x26508e6d,
+            0x1ea119fa,
+            0x3d4233dd,
+            0x2a1462b3
+        ];
+
+        for (let i = 0; i < 5; i++) {
+            if ((top >>> i) & 1) {
+                c ^= generators[i];
+            }
+        }
+    }
+
+    return c >>> 0;
+}
+
+function hrpExpand(hrp) {
+
+    let high = [];
+    let low = [];
+
+    for (const char of hrp) {
+        let value = char.charCodeAt(0);
+        high.push(value >> 5);
+        low.push(value & 31);
+    }
+
+    return [...high, 0, ...low];
+}
+
+function convertBits(data, from, to, pad) {
+
+    let accumulator = 0;
+    let bits = 0;
+    let output = [];
+
+    const maxValue = (1 << to) - 1;
+
+    for (const value of data) {
+
+        if (value < 0 || (value >> from)) {
+            throw new Error("Invalid bit conversion");
+        }
+
+        accumulator =
+            (accumulator << from) | value;
+
+        bits += from;
+
+        while (bits >= to) {
+            bits -= to;
+            output.push(
+                (accumulator >> bits) & maxValue
+            );
+        }
+    }
+
+    if (pad) {
+        if (bits) {
+            output.push(
+                (accumulator << (to - bits)) & maxValue
+            );
+        }
+    } else if (
+        bits >= from ||
+        ((accumulator << (to - bits)) & maxValue)
+    ) {
+        throw new Error("Invalid padding");
+    }
+
+    return output;
+}
+
+function bech32(hrp, version, program) {
+
+    const data = [
+        version,
+        ...convertBits(program, 8, 5, true)
+    ];
+
+    const values = [
+        ...hrpExpand(hrp),
+        ...data,
+        0, 0, 0, 0, 0, 0
+    ];
+
+    const mod = polymod(values) ^ 1;
+
+    let checksumValues = [];
+
+    for (let i = 0; i < 6; i++) {
+        checksumValues.push(
+            (mod >>> (5 * (5 - i))) & 31
+        );
+    }
+
+    return hrp + "1" +
+        [...data, ...checksumValues]
+        .map(x => BECH32[x])
+        .join("");
+}
+
+
+/* Derivation */
+
+function deriveNode(seed, path) {
+
+    const root = HDKey.fromMasterSeed(seed);
+
+    return root.derive(path);
+}
+
+function getPublicKey(seed, path, compressed = true) {
+
+    const node = deriveNode(seed, path);
+
+    return secp256k1.getPublicKey(
+        node.privateKey,
+        compressed
+    );
+}
+
+
+/* Bitcoin addresses */
+
+function bitcoinAddresses(seed) {
+
+    const legacyPub = getPublicKey(
+        seed,
+        "m/44'/0'/0'/0/0",
+        true
+    );
+
+    const nestedPub = getPublicKey(
+        seed,
+        "m/49'/0'/0'/0/0",
+        true
+    );
+
+    const nativePub = getPublicKey(
+        seed,
+        "m/84'/0'/0'/0/0",
+        true
+    );
+
+    const legacy = base58check(
+        0,
+        hash160(legacyPub)
+    );
+
+    const redeemScript = concat(
+        new Uint8Array([0, 20]),
+        hash160(nestedPub)
+    );
+
+    const nested = base58check(
+        5,
+        hash160(redeemScript)
+    );
+
+    const native = bech32(
+        "bc",
+        0,
+        hash160(nativePub)
+    );
+
+    return {
+        BTC_Legacy: legacy,
+        BTC_NestedSegWit: nested,
+        BTC_NativeSegWit: native
+    };
+}
+
+
+/* Ethereum / BNB */
+
+function evmAddress(seed, coinType) {
+
+    const publicKey = getPublicKey(
+        seed,
+        `m/44'/${coinType}'/0'/0/0`,
+        false
+    );
+
+    const hash = keccak_256(
+        publicKey.slice(1)
+    );
+
+    return "0x" + hex(hash.slice(-20));
+}
+
+
+/* Tron */
+
+function tronAddress(seed) {
+
+    const publicKey = getPublicKey(
+        seed,
+        "m/44'/195'/0'/0/0",
+        false
+    );
+
+    const hash = keccak_256(
+        publicKey.slice(1)
+    );
+
+    const payload = concat(
+        new Uint8Array([0x41]),
+        hash.slice(-20)
+    );
+
+    return base58(checksum(payload));
+}
+
+
+/* Network requests */
+
+async function fetchJSON(url, options = {}) {
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(
+        () => controller.abort(),
+        15000
+    );
+
+    try {
+
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        return await response.json();
+
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+
+/* Bitcoin balance and transaction count */
+
+async function checkBTC(address) {
+
+    const data = await fetchJSON(
+        "https://blockstream.info/api/address/" +
+        encodeURIComponent(address)
+    );
+
+    const confirmed =
+        data.chain_stats.funded_txo_sum -
+        data.chain_stats.spent_txo_sum;
+
+    const unconfirmed =
+        data.mempool_stats.funded_txo_sum -
+        data.mempool_stats.spent_txo_sum;
+
+    return {
+        balance_satoshis: confirmed + unconfirmed,
+        balance_BTC: (confirmed + unconfirmed) / 100000000,
+        transaction_count:
+            data.chain_stats.tx_count +
+            data.mempool_stats.tx_count
+    };
+}
+
+
+/* Ethereum and BNB RPC */
+
+async function rpc(url, method, params) {
+
+    const data = await fetchJSON(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method,
+            params
+        })
+    });
+
+    if (data.error) {
+        throw new Error(
+            data.error.message || "RPC error"
+        );
+    }
+
+    return data.result;
+}
+
+async function checkEVM(url, address) {
+
+    const balance = await rpc(
+        url,
+        "eth_getBalance",
+        [address, "latest"]
+    );
+
+    const nonce = await rpc(
+        url,
+        "eth_getTransactionCount",
+        [address, "latest"]
+    );
+
+    return {
+        balance_wei: BigInt(balance).toString(),
+        transaction_nonce: parseInt(nonce, 16),
+        note: "Nonce فقط تعداد تراکنش‌های خروجی را نشان می‌دهد، نه تمام تاریخچه."
+    };
+}
+
+
+/* TRON */
+
+async function checkTRON(address) {
+
+    const account = await fetchJSON(
+        "https://api.trongrid.io/v1/accounts/" +
+        encodeURIComponent(address)
+    );
+
+    const data =
+        account.data && account.data.length
+        ? account.data[0]
+        : null;
+
+    return {
+        balance_sun: data ? data.balance : 0,
+        balance_TRX:
+            data ? data.balance / 1000000 : 0,
+        account_found: !!data,
+        note: "برای تاریخچه کامل تراکنش‌های TRON بررسی جداگانه لازم است."
+    };
+}
+
+
+/* Save progress */
+
+function getCursor() {
+
+    try {
+        return JSON.parse(
+            localStorage.getItem("wrs3_cursor") ||
+            '{"position":0,"index":0,"valid":0}'
+        );
+    } catch {
+        return {
+            position: 0,
+            index: 0,
+            valid: 0
+        };
+    }
+}
+
+function saveCursor(cursor) {
+
+    localStorage.setItem(
+        "wrs3_cursor",
+        JSON.stringify(cursor)
+    );
+}
+
+function saveResults() {
+
+    localStorage.setItem(
+        "wrs3_results",
+        JSON.stringify(results)
+    );
+}
+
+
+/* Display */
+
+function render() {
+
+    $("results").innerHTML = "";
+
+    for (
+        const item of results.slice(-30).reverse()
+    ) {
+
+        const box = document.createElement("div");
+
+        box.className = "result";
+
+        box.textContent = JSON.stringify(
+            item,
+            null,
+            2
+        );
+
+        $("results").appendChild(box);
+    }
+}
+
+
+/* Main scanner */
+
+const sleep = ms =>
+    new Promise(resolve => setTimeout(resolve, ms));
+
+
+async function scan() {
+
+    stopFlag = false;
+
+    const words = $("words")
+        .value
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if (words.length !== 11) {
+        status("خطا: دقیقاً ۱۱ کلمه وارد کنید.");
+        return;
+    }
+
+    if (words.some(word => !wordlist.includes(word))) {
+        status(
+            "خطا: یک یا چند کلمه در فهرست استاندارد BIP39 نیست."
+        );
+        return;
+    }
+
+    let cursor = getCursor();
+
+    const limit = Math.max(
+        1,
+        Math.min(100, Number($("limit").value) || 5)
+    );
+
+    let checkedThisRun = 0;
+
+    status("اسکن شروع شد...");
+
+    try {
+
+        while (
+            cursor.position < 12 &&
+            checkedThisRun < limit &&
+            !stopFlag
+        ) {
+
+            if (cursor.index >= 2048) {
+
+                cursor.position++;
+                cursor.index = 0;
+
+                saveCursor(cursor);
+
+                continue;
+            }
+
+            const candidate = words.slice();
+
+            candidate.splice(
+                cursor.position,
+                0,
+                wordlist[cursor.index]
+            );
+
+            cursor.index++;
+
+            if (
+                !validateMnemonic(
+                    candidate.join(" "),
+                    wordlist
+                )
+            ) {
+
+                saveCursor(cursor);
+
+                continue;
+            }
+
+            cursor.valid++;
+            checkedThisRun++;
+
+            saveCursor(cursor);
+
+            status(
+                "عبارت معتبر شماره: " + cursor.valid +
+                "\nجایگاه: " + (cursor.position + 1) +
+                "\nدر حال ساخت آدرس‌ها و بررسی شبکه‌ها..."
+            );
+
+            /*
+             * عبارت کامل فقط در حافظه استفاده می‌شود.
+             * عبارت و کلید خصوصی ذخیره یا نمایش داده نمی‌شوند.
+             */
+
+            const mnemonic = candidate.join(" ");
+
+            const seed = mnemonicToSeedSync(mnemonic);
+
+            const addresses = {
+
+                ...bitcoinAddresses(seed),
+
+                ETH: evmAddress(seed, 60),
+
+                BNB: evmAddress(seed, 60),
+
+                TRON: tronAddress(seed)
+
+            };
+
+            const result = {
+
+                candidate_number: cursor.valid,
+
+                addresses: addresses,
+
+                checks: {},
+
+                checked_at: new Date().toISOString()
+
+            };
+
+
+            /* Check Bitcoin addresses */
+
+            for (
+                const name of [
+                    "BTC_Legacy",
+                    "BTC_NestedSegWit",
+                    "BTC_NativeSegWit"
+                ]
+            ) {
+
+                if (stopFlag) break;
+
+                try {
+
+                    result.checks[name] =
+                        await checkBTC(addresses[name]);
+
+                } catch (error) {
+
+                    result.checks[name] = {
+                        error: String(error.message || error)
+                    };
+
+                }
+
+                await sleep(500);
+            }
+
+
+            /* Check Ethereum */
+
+            if (!stopFlag) {
+
+                try {
+
+                    result.checks.ETH =
+                        await checkEVM(
+                            "https://ethereum-rpc.publicnode.com",
+                            addresses.ETH
+                        );
+
+                } catch (error) {
+
+                    result.checks.ETH = {
+                        error: String(error.message || error)
+                    };
+
+                }
+
+                await sleep(500);
+            }
+
+
+            /* Check BNB Smart Chain */
+
+            if (!stopFlag) {
+
+                try {
+
+                    result.checks.BNB =
+                        await checkEVM(
+                            "https://bsc-rpc.publicnode.com",
+                            addresses.BNB
+                        );
+
+                } catch (error) {
+
+                    result.checks.BNB = {
+                        error: String(error.message || error)
+                    };
+
+                }
+
+                await sleep(500);
+            }
+
+
+            /* Check TRON */
+
+            if (!stopFlag) {
+
+                try {
+
+                    result.checks.TRON =
+                        await checkTRON(addresses.TRON);
+
+                } catch (error) {
+
+                    result.checks.TRON = {
+                        error: String(error.message || error)
+                    };
+
+                }
+            }
+
+
+            results.push(result);
+
+            saveResults();
+
+            render();
+
+            candidate.fill("");
+
+            status(
+                "اسکن ادامه دارد.\n" +
+                "جایگاه فعلی: " + (cursor.position + 1) +
+                " از ۱۲\n" +
+                "شماره کلمه: " + cursor.index +
+                " از ۲۰۴۸\n" +
+                "عبارت معتبر بررسی‌شده: " + cursor.valid +
+                "\nاین نوبت: " + checkedThisRun
+            );
+
+            await sleep(500);
+        }
+
+
+        if (cursor.position >= 12) {
+
+            status(
+                "اسکن تمام ۱۲ جایگاه به پایان رسید."
+            );
+
+        } else if (stopFlag) {
+
+            status(
+                "اسکن متوقف شد. پیشرفت ذخیره شده است."
+            );
+
+        } else {
+
+            status(
+                "این نوبت تمام شد.\n" +
+                checkedThisRun +
+                " عبارت معتبر بررسی شد.\n" +
+                "برای ادامه دوباره دکمه شروع را بزنید."
+            );
+        }
+
+    } catch (error) {
+
+        status(
+            "خطا: " +
+            String(error.message || error) +
+            "\nپیشرفت قبلی ذخیره شده است."
+        );
+
+    }
+}
+
+
+/* Buttons */
+
+$("start").onclick = scan;
+
+$("stop").onclick = () => {
+
+    stopFlag = true;
+
+    status(
+        "درخواست توقف ثبت شد. پس از پایان درخواست فعلی متوقف می‌شود."
+    );
+
+};
+
+
+$("clear").onclick = () => {
+
+    if (
+        confirm(
+            "آیا مطمئن هستید پیشرفت و گزارش‌ها پاک شود؟"
+        )
+    ) {
+
+        localStorage.removeItem("wrs3_cursor");
+
+        localStorage.removeItem("wrs3_results");
+
+        results = [];
+
+        render();
+
+        status("پیشرفت پاک شد.");
+
+    }
+
+};
+
+
+/* CSV report */
+
+$("csv").onclick = () => {
+
+    const rows = [
+        [
+            "Candidate",
+            "Network",
+            "Address",
+            "Result"
+        ]
+    ];
+
+    for (const item of results) {
+
+        for (
+            const [network, address]
+            of Object.entries(item.addresses)
+        ) {
+
+            rows.push([
+                item.candidate_number,
+                network,
+                address,
+                JSON.stringify(
+                    item.checks[network] || {}
+                )
+            ]);
+
+        }
+
+    }
+
+    const csv = rows.map(row =>
+        row.map(value =>
+            '"' +
+            String(value).replaceAll('"', '""') +
+            '"'
+        ).join(",")
+    ).join("\n");
+
+    const blob = new Blob(
+        ["\ufeff" + csv],
+        {
+            type: "text/csv;charset=utf-8"
+        }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download = "wallet-recovery-report.csv";
+
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+};
+
+
+render();
+
+</script>
+
+</body>
+</html>
