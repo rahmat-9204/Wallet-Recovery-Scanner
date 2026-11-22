@@ -986,13 +986,13 @@ async function scan() {
 
     const limit = Math.max(
         1,
-        Math.min(100,Number($("limit").value)||5)
+        Math.min(500,Number($("limit").value)||150)
     );
 
     /* تاخیر پویا — از ورودی خوانده می‌شود و خودکار تنظیم می‌شود */
     const baseDelay = Math.max(
         0,
-        Math.min(5000,Number($("delay").value)||150)
+        Math.min(5000,Number($("delay").value)||500)
     );
     let currentDelay = baseDelay;
     let successStreak = 0;
