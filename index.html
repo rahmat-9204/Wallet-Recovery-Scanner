@@ -1180,7 +1180,7 @@ async function scan() {
                 successStreak = 0;
                 currentDelay = Math.min(
                     2000,
-                    Math.max(100, Math.floor(currentDelay * 2))
+                    Math.max(500, Math.floor(currentDelay * 2))
                 );
                 $("delay").value = currentDelay;
             } else {
