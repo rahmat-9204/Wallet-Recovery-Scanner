@@ -93,6 +93,10 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 
 <input id="limit" type="number" value="5" min="1" max="100">
 
+<h3>۳. تاخیر بین عبارت‌ها (میلی‌ثانیه)</h3>
+
+<input id="delay" type="number" value="150" min="0" max="5000">
+
 <button id="start">شروع / ادامه اسکن</button>
 <button id="stop" class="stop">توقف اسکن</button>
 <button id="clear" class="clear">پاک کردن پیشرفت</button>
@@ -106,6 +110,7 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 
 <p class="small">
 این نسخه اولین آدرس استاندارد را بررسی می‌کند و همه‌ی شبکه‌ها را موازی چک می‌کند.
+تاخیر بین عبارت‌ها قابل تنظیم است و در صورت خطای زیاد، خودکار افزایش می‌یابد.
 </p>
 
 </main>
@@ -454,7 +459,9 @@ async function fetchJSON(url,options={}) {
         });
 
         if (!response.ok) {
-            throw Error("HTTP "+response.status);
+            const err = Error("HTTP "+response.status);
+            err.status = response.status;
+            throw err;
         }
 
         return await response.json();
@@ -927,6 +934,30 @@ const sleep = ms =>
     new Promise(resolve=>setTimeout(resolve,ms));
 
 
+/* تشخیص خطای rate-limit در داده‌های checks */
+function hasRateLimitError(result) {
+
+    let errors = 0;
+
+    for (const data of Object.values(result.checks)) {
+
+        if (!data || !data.error) continue;
+
+        const msg = String(data.error);
+
+        if (
+            msg.includes("429") ||
+            msg.toLowerCase().includes("rate") ||
+            msg.toLowerCase().includes("too many")
+        ) {
+            errors++;
+        }
+    }
+
+    return errors > 0;
+}
+
+
 async function scan() {
 
     if (running) return;
@@ -959,6 +990,14 @@ async function scan() {
         1,
         Math.min(100,Number($("limit").value)||5)
     );
+
+    /* تاخیر پویا — از ورودی خوانده می‌شود و خودکار تنظیم می‌شود */
+    let baseDelay = Math.max(
+        0,
+        Math.min(5000,Number($("delay").value)||150)
+    );
+    let currentDelay = baseDelay;
+    let successStreak = 0;
 
     let checked = 0;
 
@@ -1006,6 +1045,7 @@ async function scan() {
             status(
                 "عبارت معتبر شماره: "+cursor.valid+
                 "\nجایگاه در حال بررسی: "+(cursor.position+1)+
+                "\nتاخیر فعلی: "+currentDelay+" ms"+
                 "\nدر حال بررسی موازی همه شبکه‌ها..."
             );
 
@@ -1034,7 +1074,6 @@ async function scan() {
 
             const jobs = [];
 
-            // BTC (۳ شبکه)
             for (const network of [
                 "BTC_Legacy",
                 "BTC_NestedSegWit",
@@ -1051,7 +1090,6 @@ async function scan() {
                 );
             }
 
-            // ETH native
             jobs.push(
                 checkEVM(
                     "https://ethereum-rpc.publicnode.com",
@@ -1065,7 +1103,6 @@ async function scan() {
                 })
             );
 
-            // USDT ERC20
             jobs.push(
                 checkUSDT_EVM(
                     "https://ethereum-rpc.publicnode.com",
@@ -1081,7 +1118,6 @@ async function scan() {
                 })
             );
 
-            // BNB native
             jobs.push(
                 checkEVM(
                     "https://bsc-rpc.publicnode.com",
@@ -1095,7 +1131,6 @@ async function scan() {
                 })
             );
 
-            // USDT BEP20
             jobs.push(
                 checkUSDT_EVM(
                     "https://bsc-rpc.publicnode.com",
@@ -1111,7 +1146,6 @@ async function scan() {
                 })
             );
 
-            // USDC (۷ شبکه)
             jobs.push(
                 checkUSDC_NETWORKS(addresses)
                 .then(usdcChecks => {
@@ -1121,7 +1155,6 @@ async function scan() {
                 })
             );
 
-            // TRON + TRC20
             jobs.push(
                 checkTRON(addresses.TRON)
                 .then(data => {
@@ -1140,6 +1173,29 @@ async function scan() {
             );
 
             await Promise.allSettled(jobs);
+
+            /* ===== تنظیم خودکار تاخیر ===== */
+
+            const rateLimited = hasRateLimitError(result);
+
+            if (rateLimited) {
+                successStreak = 0;
+                currentDelay = Math.min(
+                    2000,
+                    Math.max(100, Math.floor(currentDelay * 2))
+                );
+                $("delay").value = currentDelay;
+            } else {
+                successStreak++;
+                if (successStreak >= 3 && currentDelay > baseDelay) {
+                    currentDelay = Math.max(
+                        baseDelay,
+                        Math.floor(currentDelay / 2)
+                    );
+                    successStreak = 0;
+                    $("delay").value = currentDelay;
+                }
+            }
 
             /* Save only positive assets */
 
@@ -1183,7 +1239,7 @@ async function scan() {
 
             candidate.fill("");
 
-            await sleep(150);
+            await sleep(currentDelay);
         }
 
 
