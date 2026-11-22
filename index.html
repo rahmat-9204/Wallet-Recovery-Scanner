@@ -937,8 +937,6 @@ const sleep = ms =>
 /* تشخیص خطای rate-limit در داده‌های checks */
 function hasRateLimitError(result) {
 
-    let errors = 0;
-
     for (const data of Object.values(result.checks)) {
 
         if (!data || !data.error) continue;
@@ -950,11 +948,11 @@ function hasRateLimitError(result) {
             msg.toLowerCase().includes("rate") ||
             msg.toLowerCase().includes("too many")
         ) {
-            errors++;
+            return true;
         }
     }
 
-    return errors > 0;
+    return false;
 }
 
 
@@ -992,7 +990,7 @@ async function scan() {
     );
 
     /* تاخیر پویا — از ورودی خوانده می‌شود و خودکار تنظیم می‌شود */
-    let baseDelay = Math.max(
+    const baseDelay = Math.max(
         0,
         Math.min(5000,Number($("delay").value)||150)
     );
@@ -1070,7 +1068,7 @@ async function scan() {
                 checks:{}
             };
 
-            /* ===== همه شبکه‌ها موازی ===== */
+            /* ===== همه شبکه‌ها موازی (داخل یک عبارت) ===== */
 
             const jobs = [];
 
