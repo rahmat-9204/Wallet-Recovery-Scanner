@@ -3,72 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wallet Balance Checker</title>
+<title>Wallet Recovery & Balance Checker</title>
 
 <style>
 *{box-sizing:border-box}
 body{
-    font-family:Arial,sans-serif;
-    background:#f1f4f9;
-    color:#172033;
-    padding:15px;
-    margin:0
+ font-family:Arial,sans-serif;
+ background:#f1f4f9;
+ color:#172033;
+ padding:12px;
+ margin:0
 }
 main{
-    max-width:850px;
-    margin:auto;
-    background:white;
-    padding:20px;
-    border-radius:14px;
-    box-shadow:0 3px 15px #0001
+ max-width:850px;
+ margin:auto;
+ background:white;
+ padding:18px;
+ border-radius:14px;
+ box-shadow:0 3px 15px #0001
 }
 h2{text-align:center;color:#173c70}
-textarea,input,select,button{
-    width:100%;
-    padding:12px;
-    margin:7px 0;
-    border:1px solid #ccd5e2;
-    border-radius:8px;
-    font-size:14px
+h3{color:#1769aa}
+textarea,input,button{
+ width:100%;
+ padding:12px;
+ margin:7px 0;
+ border:1px solid #ccd5e2;
+ border-radius:8px;
+ font-size:14px
 }
-textarea{height:120px;direction:ltr}
+textarea{
+ height:100px;
+ direction:ltr;
+ text-align:left
+}
 button{
-    background:#1769aa;
-    color:white;
-    border:0;
-    cursor:pointer;
-    font-weight:bold
+ background:#1769aa;
+ color:white;
+ border:0;
+ cursor:pointer;
+ font-weight:bold
 }
 button:disabled{background:#999}
-.stop{background:#bd3545}
 .secondary{background:#536579}
+.stop{background:#bd3545}
 .status{
-    padding:12px;
-    background:#eef5ff;
-    border-radius:8px;
-    margin-top:12px;
-    line-height:1.8
+ padding:12px;
+ background:#eef5ff;
+ border-radius:8px;
+ margin-top:12px;
+ line-height:1.8
 }
 .card{
-    border:1px solid #dce3ed;
-    padding:12px;
-    border-radius:9px;
-    margin:10px 0;
-    overflow-wrap:anywhere
+ border:1px solid #dce3ed;
+ padding:12px;
+ border-radius:9px;
+ margin:10px 0;
+ overflow-wrap:anywhere
 }
 .good{border-right:4px solid #16a36a}
 .bad{border-right:4px solid #d94a4a}
 .muted{color:#68758a;font-size:12px}
 table{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:10px
+ width:100%;
+ border-collapse:collapse;
+ margin-top:10px
 }
 td,th{
-    padding:9px;
-    border-bottom:1px solid #e2e7ef;
-    text-align:right;
-    font-size:13px
+ padding:9px;
+ border-bottom:1px solid #e2e7ef;
+ text-align:right;
+ font-size:13px
+}
+.section{
+ border:1px solid #e1e7ef;
+ border-radius:10px;
+ padding:13px;
+ margin-top:15px
 }
 </style>
 </head>
@@ -76,36 +87,100 @@ td,th{
 <body>
 <main>
 
-<h2>بررسی موجودی کیف پول</h2>
+<h2>Wallet Recovery & Balance Checker</h2>
+
+<div class="section">
+<h3>۱. اعتبارسنجی عبارت بازیابی کامل</h3>
 
 <p class="muted">
-فقط آدرس عمومی کیف پول را وارد کنید.
-این برنامه هیچ عبارت بازیابی یا کلید خصوصی دریافت نمی‌کند.
+این قسمت فقط عبارت کامل ۱۲ کلمه‌ای را اعتبارسنجی می‌کند.
+عبارت بازیابی به API ارسال نمی‌شود.
 </p>
 
-<label>آدرس‌های عمومی (هر آدرس در یک خط):</label>
-<textarea id="addresses" placeholder="آدرس BTC یا ETH یا TRON را وارد کنید"></textarea>
+<textarea id="mnemonic"
+placeholder="Enter your complete 12 words here"></textarea>
 
-<label>تعداد درخواست هم‌زمان:</label>
+<button onclick="validatePhrase()">بررسی اعتبار ۱۲ کلمه</button>
+
+<div id="phraseStatus" class="status">
+آماده بررسی
+</div>
+</div>
+
+<div class="section">
+<h3>۲. بررسی موجودی آدرس‌های عمومی</h3>
+
+<p class="muted">
+آدرس‌های عمومی خودت را وارد کن. هر آدرس در یک خط.
+هیچ کلمه بازیابی یا کلید خصوصی وارد نکن.
+</p>
+
+<textarea id="addresses"
+placeholder="BTC / ETH / BNB / TRON addresses"></textarea>
+
+<label>تعداد درخواست هم‌زمان</label>
 <select id="workers">
 <option value="1">۱</option>
 <option value="2">۲</option>
 <option value="3">۳</option>
 </select>
 
-<button id="startBtn" onclick="startScan()">شروع بررسی</button>
-<button class="stop" onclick="stopScan()">توقف</button>
-<button class="secondary" onclick="downloadCSV()">دانلود CSV</button>
+<button id="startBtn" onclick="startScan()">شروع بررسی موجودی</button>
+<button class="stop" onclick="stopScan()">توقف بررسی</button>
+<button class="secondary" onclick="downloadCSV()">دانلود نتایج CSV</button>
 <button class="secondary" onclick="clearResults()">پاک‌کردن نتایج</button>
 
-<div class="status" id="status">آماده بررسی</div>
+<div class="status" id="status">
+آماده بررسی
+</div>
 
 <div id="results"></div>
+</div>
 
 </main>
 
-<script>
-const RPC = {
+<script type="module">
+
+import { validateMnemonic }
+from "https://esm.sh/@scure/bip39@1.5.4";
+
+import { wordlist }
+from "https://esm.sh/@scure/bip39@1.5.4/wordlists/english";
+
+window.validatePhrase=function(){
+
+ const phrase=document.getElementById("mnemonic")
+ .value.trim().toLowerCase().replace(/\s+/g," ");
+
+ const status=document.getElementById("phraseStatus");
+
+ const words=phrase.split(" ");
+
+ if(words.length!==12){
+  status.innerText="عبارت باید دقیقاً ۱۲ کلمه داشته باشد.";
+  return;
+ }
+
+ try{
+
+  const valid=validateMnemonic(phrase,wordlist);
+
+  if(valid){
+   status.innerText=
+   "عبارت ۱۲ کلمه‌ای از نظر ساختار و چک‌سام BIP39 معتبر است.";
+   status.style.background="#e6f8ee";
+  }else{
+   status.innerText=
+   "عبارت معتبر نیست. ترتیب یا یکی از کلمات را بررسی کن.";
+   status.style.background="#ffecec";
+  }
+
+ }catch(e){
+  status.innerText="خطا در اعتبارسنجی: "+e.message;
+ }
+};
+
+const RPC={
  ethereum:"https://ethereum-rpc.publicnode.com",
  bsc:"https://bsc-rpc.publicnode.com",
  polygon:"https://polygon-bor-rpc.publicnode.com",
@@ -115,12 +190,11 @@ const RPC = {
  avalanche:"https://avalanche-c-chain-rpc.publicnode.com"
 };
 
-const CHAINS = [
+const CHAINS=[
  {
   name:"Ethereum",
   key:"ethereum",
   symbol:"ETH",
-  decimals:18,
   tokens:[
    ["USDT","0xdAC17F958D2ee523a2206206994597C13D831ec7",6],
    ["USDC","0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",6]
@@ -130,7 +204,6 @@ const CHAINS = [
   name:"BNB Smart Chain",
   key:"bsc",
   symbol:"BNB",
-  decimals:18,
   tokens:[
    ["USDT","0x55d398326f99059fF775485246999027B3197955",18],
    ["USDC","0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",18]
@@ -140,7 +213,6 @@ const CHAINS = [
   name:"Polygon",
   key:"polygon",
   symbol:"POL",
-  decimals:18,
   tokens:[
    ["USDT","0xc2132D05D31c914a87C6611C10748AaCbAbeD5F",6],
    ["USDC","0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",6]
@@ -150,7 +222,6 @@ const CHAINS = [
   name:"Arbitrum",
   key:"arbitrum",
   symbol:"ETH",
-  decimals:18,
   tokens:[
    ["USDT","0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",6],
    ["USDC","0xaf88d065e77c8cC2239327C5EDb3A432268e5831",6]
@@ -160,7 +231,6 @@ const CHAINS = [
   name:"Base",
   key:"base",
   symbol:"ETH",
-  decimals:18,
   tokens:[
    ["USDC","0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",6]
   ]
@@ -169,7 +239,6 @@ const CHAINS = [
   name:"Optimism",
   key:"optimism",
   symbol:"ETH",
-  decimals:18,
   tokens:[
    ["USDT","0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",6],
    ["USDC","0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",6]
@@ -179,7 +248,6 @@ const CHAINS = [
   name:"Avalanche",
   key:"avalanche",
   symbol:"AVAX",
-  decimals:18,
   tokens:[
    ["USDT","0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",6],
    ["USDC","0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",6]
@@ -190,14 +258,13 @@ const CHAINS = [
 let running=false;
 let results=[];
 let completed=0;
-let total=0;
-
-function setStatus(text){
- document.getElementById("status").innerText=text;
-}
 
 function sleep(ms){
- return new Promise(resolve=>setTimeout(resolve,ms));
+ return new Promise(r=>setTimeout(r,ms));
+}
+
+function setStatus(t){
+ document.getElementById("status").innerText=t;
 }
 
 function validEVM(a){
@@ -213,29 +280,27 @@ function validTRON(a){
  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
 }
 
-async function requestJSON(url,options={}){
+async function getJSON(url,options={}){
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),15000);
 
  try{
-  const response=await fetch(url,{
+  const r=await fetch(url,{
    ...options,
    signal:controller.signal
   });
 
-  if(!response.ok){
-   throw new Error("HTTP "+response.status);
-  }
+  if(!r.ok)throw new Error("HTTP "+r.status);
 
-  return await response.json();
-
+  return await r.json();
  }finally{
   clearTimeout(timer);
  }
 }
 
 async function rpc(chain,method,params){
- const data=await requestJSON(RPC[chain],{
+
+ const data=await getJSON(RPC[chain],{
   method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({
@@ -246,53 +311,65 @@ async function rpc(chain,method,params){
   })
  });
 
- if(data.error) throw new Error(data.error.message);
+ if(data.error)throw new Error(data.error.message);
+
  return data.result;
 }
 
 function formatUnits(value,decimals){
- let n=BigInt(value);
- let base=10n**BigInt(decimals);
- let whole=n/base;
- let fraction=(n%base).toString().padStart(decimals,"0");
+
+ const n=BigInt(value);
+ const base=10n**BigInt(decimals);
+
+ const whole=n/base;
+
+ let fraction=(n%base).toString()
+ .padStart(decimals,"0");
+
  fraction=fraction.replace(/0+$/,"");
- return fraction ? whole+"."+fraction : whole.toString();
+
+ return fraction
+ ? whole+"."+fraction
+ : whole.toString();
 }
 
 async function checkEVM(address,chain){
+
  let found=[];
+ let errors=[];
 
  try{
+
   const balance=await rpc(
    chain.key,
    "eth_getBalance",
    [address,"latest"]
   );
 
-  const native=BigInt(balance);
+  const amount=BigInt(balance);
 
-  if(native>0n){
+  if(amount>0n){
    found.push({
     network:chain.name,
     token:chain.symbol,
-    balance:formatUnits(native,chain.decimals)
+    balance:formatUnits(amount,18)
    });
   }
 
  }catch(e){
-  throw new Error(chain.name+" native: "+e.message);
+  errors.push(chain.name+" native: "+e.message);
  }
 
  for(const token of chain.tokens){
 
-  if(!running) break;
+  if(!running)break;
 
   try{
+
    const contract=token[1];
-   const decimals=token[2];
 
    const data="0x70a08231"+
-    address.slice(2).toLowerCase().padStart(64,"0");
+   address.slice(2).toLowerCase().padStart(64,"0");
 
    const result=await rpc(
     chain.key,
@@ -306,52 +383,55 @@ async function checkEVM(address,chain){
     found.push({
      network:chain.name,
      token:token[0],
-     balance:formatUnits(amount,decimals)
+     balance:formatUnits(amount,token[2])
     });
    }
 
   }catch(e){
-   console.warn(chain.name,token[0],e.message);
+   errors.push(chain.name+" "+token[0]+": "+e.message);
   }
 
-  await sleep(200);
+  await sleep(150);
  }
 
- return found;
+ return {found,errors};
 }
 
 async function checkBTC(address){
- const data=await requestJSON(
-  "https://blockstream.info/api/address/"+encodeURIComponent(address)
+
+ const data=await getJSON(
+  "https://blockstream.info/api/address/"+
+  encodeURIComponent(address)
  );
 
- const funded=data.chain_stats.funded_txo_sum+
-              data.mempool_stats.funded_txo_sum;
+ const funded=
+ data.chain_stats.funded_txo_sum+
+ data.mempool_stats.funded_txo_sum;
 
- const spent=data.chain_stats.spent_txo_sum+
-             data.mempool_stats.spent_txo_sum;
+ const spent=
+ data.chain_stats.spent_txo_sum+
+ data.mempool_stats.spent_txo_sum;
 
  const sats=funded-spent;
 
- if(sats>0){
-  return [{
-   network:"Bitcoin",
-   token:"BTC",
-   balance:(sats/100000000).toFixed(8)
-  }];
- }
-
- return [];
+ return sats>0
+ ? [{
+  network:"Bitcoin",
+  token:"BTC",
+  balance:(sats/100000000).toFixed(8)
+ }]
+ : [];
 }
 
 async function checkTRON(address){
- const data=await requestJSON(
+
+ const data=await getJSON(
   "https://api.trongrid.io/wallet/getaccount",
   {
    method:"POST",
    headers:{"Content-Type":"application/json"},
    body:JSON.stringify({
-    address:address,
+    address,
     visible:true
    })
   }
@@ -367,18 +447,20 @@ async function checkTRON(address){
   });
  }
 
- const tokens=data.trc20||[];
+ for(const item of (data.trc20||[])){
 
- for(const item of tokens){
   for(const contract in item){
+
    const raw=item[contract];
 
    if(raw && BigInt(raw)>0n){
+
     found.push({
      network:"TRON",
      token:contract,
      balance:"مقدار خام: "+raw
     });
+
    }
   }
  }
@@ -387,22 +469,22 @@ async function checkTRON(address){
 }
 
 async function checkAddress(address){
+
  let found=[];
  let errors=[];
 
  if(validEVM(address)){
 
   for(const chain of CHAINS){
-   if(!running) break;
 
-   try{
-    const data=await checkEVM(address,chain);
-    found.push(...data);
-   }catch(e){
-    errors.push(e.message);
-   }
+   if(!running)break;
 
-   await sleep(300);
+   const data=await checkEVM(address,chain);
+
+   found.push(...data.found);
+   errors.push(...data.errors);
+
+   await sleep(250);
   }
 
  }else if(validBTC(address)){
@@ -428,8 +510,8 @@ async function checkAddress(address){
  return {found,errors};
 }
 
-function escapeHTML(text){
- return String(text).replace(/[&<>"']/g,c=>({
+function esc(t){
+ return String(t).replace(/[&<>"']/g,c=>({
   "&":"&amp;",
   "<":"&lt;",
   ">":"&gt;",
@@ -439,14 +521,14 @@ function escapeHTML(text){
 }
 
 function showResult(address,data){
+
  const box=document.createElement("div");
 
  box.className="card "+(
   data.found.length?"good":"bad"
  );
 
- let html="<b>آدرس:</b><br>"+
- escapeHTML(address)+"<br><br>";
+ let html="<b>آدرس:</b><br>"+esc(address)+"<br><br>";
 
  if(data.found.length){
 
@@ -455,21 +537,26 @@ function showResult(address,data){
   html+="<table><tr><th>شبکه</th><th>ارز</th><th>موجودی</th></tr>";
 
   for(const item of data.found){
-   html+="<tr><td>"+escapeHTML(item.network)+
-   "</td><td>"+escapeHTML(item.token)+
-   "</td><td>"+escapeHTML(item.balance)+"</td></tr>";
+
+   html+="<tr><td>"+esc(item.network)+
+   "</td><td>"+esc(item.token)+
+   "</td><td>"+esc(item.balance)+"</td></tr>";
   }
 
   html+="</table>";
 
  }else{
+
   html+="هیچ موجودی مثبتی در موارد بررسی‌شده پیدا نشد.";
+
  }
 
  if(data.errors.length){
-  html+="<p class='muted'>خطاها:<br>"+
-  data.errors.map(escapeHTML).join("<br>")+
+
+  html+="<p class='muted'>خطاهای API:<br>"+
+  data.errors.map(esc).join("<br>")+
   "</p>";
+
  }
 
  box.innerHTML=html;
@@ -477,7 +564,8 @@ function showResult(address,data){
  document.getElementById("results").prepend(box);
 }
 
-async function startScan(){
+window.startScan=async function(){
+
  if(running)return;
 
  const addresses=document.getElementById("addresses")
@@ -486,23 +574,23 @@ async function startScan(){
  .filter(Boolean);
 
  if(!addresses.length){
-  alert("لطفاً آدرس عمومی وارد کنید");
+  alert("آدرس عمومی وارد کن");
   return;
  }
 
  running=true;
  completed=0;
- total=addresses.length;
 
  document.getElementById("startBtn").disabled=true;
+
+ let index=0;
 
  const workers=Number(
   document.getElementById("workers").value
  );
 
- let index=0;
-
  async function worker(){
+
   while(running){
 
    const current=index++;
@@ -513,26 +601,35 @@ async function startScan(){
 
    setStatus(
     "در حال بررسی "+(current+1)+
-    " از "+total
+    " از "+addresses.length
    );
 
-   const data=await checkAddress(address);
+   try{
 
-   if(data.found.length){
-    results.push({
-     address,
-     assets:data.found
+    const data=await checkAddress(address);
+
+    if(data.found.length){
+
+     results.push({
+      address,
+      assets:data.found
+     });
+
+    }
+
+    showResult(address,data);
+
+   }catch(e){
+
+    showResult(address,{
+     found:[],
+     errors:[e.message]
     });
-   }
 
-   showResult(address,data);
+   }
 
    completed++;
 
-   setStatus(
-    "بررسی شده: "+completed+
-    " از "+total
-   );
   }
  }
 
@@ -544,29 +641,32 @@ async function startScan(){
 
  document.getElementById("startBtn").disabled=false;
 
- setStatus(
-  "بررسی پایان یافت. تعداد بررسی‌شده: "+completed
- );
+ setStatus("بررسی پایان یافت. بررسی‌شده: "+completed);
 
  localStorage.setItem(
   "wallet_checker_results",
   JSON.stringify(results)
  );
-}
+};
 
-function stopScan(){
+window.stopScan=function(){
  running=false;
  setStatus("درخواست توقف ثبت شد");
-}
+};
 
-function clearResults(){
+window.clearResults=function(){
+
  results=[];
- document.getElementById("results").innerHTML="";
- localStorage.removeItem("wallet_checker_results");
- setStatus("نتایج پاک شد");
-}
 
-function downloadCSV(){
+ document.getElementById("results").innerHTML="";
+
+ localStorage.removeItem("wallet_checker_results");
+
+ setStatus("نتایج پاک شد");
+};
+
+window.downloadCSV=function(){
+
  if(!results.length){
   alert("نتیجه‌ای برای دانلود وجود ندارد");
   return;
@@ -575,8 +675,11 @@ function downloadCSV(){
  let csv="Address,Network,Token,Balance\n";
 
  for(const item of results){
+
   for(const asset of item.assets){
+
    csv+=`"${item.address}","${asset.network}","${asset.token}","${asset.balance}"\n`;
+
   }
  }
 
@@ -586,27 +689,28 @@ function downloadCSV(){
  );
 
  const url=URL.createObjectURL(blob);
+
  const a=document.createElement("a");
 
  a.href=url;
- a.download="wallet-balances.csv";
+ a.download="wallet-results.csv";
  a.click();
 
  URL.revokeObjectURL(url);
+};
+
+try{
+
+ results=JSON.parse(
+  localStorage.getItem("wallet_checker_results")||"[]"
+ );
+
+}catch(e){
+
+ results=[];
+
 }
 
-(function loadSaved(){
- try{
-  const saved=JSON.parse(
-   localStorage.getItem("wallet_checker_results")||"[]"
-  );
-
-  results=saved;
-
- }catch(e){
-  results=[];
- }
-})();
 </script>
 </body>
 </html>
