@@ -93,6 +93,10 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 
 <input id="limit" type="number" value="5" min="1" max="100">
 
+<h3>۳. تعداد عبارت همزمان (پارالل)</h3>
+
+<input id="parallel" type="number" value="3" min="1" max="10">
+
 <button id="start">شروع / ادامه اسکن</button>
 <button id="stop" class="stop">توقف اسکن</button>
 <button id="clear" class="clear">پاک کردن پیشرفت</button>
@@ -105,8 +109,7 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <div id="results"></div>
 
 <p class="small">
-این نسخه اولین آدرس استاندارد را بررسی می‌کند.
-آدرس‌های بعدی، مسیرهای سفارشی و تمام توکن‌ها هنوز بررسی نمی‌شوند.
+این نسخه اولین آدرس استاندارد را بررسی می‌کند و شبکه‌ها و عبارت‌ها را موازی چک می‌کند.
 </p>
 
 </main>
@@ -629,7 +632,6 @@ async function checkUSDC_NETWORKS(addresses) {
 
     const checks = {};
 
-    // اجرای موازی همه شبکه‌های USDC (قابلیت جدید ۲ - سرعت)
     const jobs = entries.map(([name,cfg]) =>
         checkUSDT_EVM(
             cfg.rpc,
@@ -929,6 +931,141 @@ const sleep = ms =>
     new Promise(resolve=>setTimeout(resolve,ms));
 
 
+/* بررسی همه شبکه‌ها برای یک عبارت (موازی) */
+async function checkOneCandidate(mnemonic) {
+
+    const seed = mnemonicToSeedSync(mnemonic);
+
+    const addresses = {
+
+        ...bitcoinAddresses(seed),
+
+        ETH:evmAddress(seed),
+
+        BNB:evmAddress(seed),
+
+        TRON:tronAddress(seed)
+
+    };
+
+    const result = {
+        addresses,
+        checks:{}
+    };
+
+    const jobs = [];
+
+    // BTC
+    for (const network of [
+        "BTC_Legacy",
+        "BTC_NestedSegWit",
+        "BTC_NativeSegWit"
+    ]) {
+        jobs.push(
+            checkBTC(addresses[network])
+            .then(data => { result.checks[network] = data; })
+            .catch(error => {
+                result.checks[network] = {
+                    error:String(error.message||error)
+                };
+            })
+        );
+    }
+
+    // ETH native
+    jobs.push(
+        checkEVM(
+            "https://ethereum-rpc.publicnode.com",
+            addresses.ETH
+        )
+        .then(data => { result.checks.ETH = data; })
+        .catch(error => {
+            result.checks.ETH = {
+                error:String(error.message||error)
+            };
+        })
+    );
+
+    // USDT ERC20
+    jobs.push(
+        checkUSDT_EVM(
+            "https://ethereum-rpc.publicnode.com",
+            addresses.ETH,
+            "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            6
+        )
+        .then(data => { result.checks.USDT_ERC20 = data; })
+        .catch(error => {
+            result.checks.USDT_ERC20 = {
+                error:String(error.message||error)
+            };
+        })
+    );
+
+    // BNB native
+    jobs.push(
+        checkEVM(
+            "https://bsc-rpc.publicnode.com",
+            addresses.BNB
+        )
+        .then(data => { result.checks.BNB = data; })
+        .catch(error => {
+            result.checks.BNB = {
+                error:String(error.message||error)
+            };
+        })
+    );
+
+    // USDT BEP20
+    jobs.push(
+        checkUSDT_EVM(
+            "https://bsc-rpc.publicnode.com",
+            addresses.BNB,
+            "0x55d398326f99059fF775485246999027B3197955",
+            18
+        )
+        .then(data => { result.checks.USDT_BEP20 = data; })
+        .catch(error => {
+            result.checks.USDT_BEP20 = {
+                error:String(error.message||error)
+            };
+        })
+    );
+
+    // USDC (۷ شبکه)
+    jobs.push(
+        checkUSDC_NETWORKS(addresses)
+        .then(usdcChecks => {
+            for (const [name,data] of Object.entries(usdcChecks)) {
+                result.checks[name] = data;
+            }
+        })
+    );
+
+    // TRON + TRC20
+    jobs.push(
+        checkTRON(addresses.TRON)
+        .then(data => {
+            result.checks.TRON = data;
+            result.checks.USDT_TRC20 =
+                checkTRON_USDT(data);
+        })
+        .catch(error => {
+            result.checks.TRON = {
+                error:String(error.message||error)
+            };
+            result.checks.USDT_TRC20 = {
+                error:String(error.message||error)
+            };
+        })
+    );
+
+    await Promise.allSettled(jobs);
+
+    return result;
+}
+
+
 async function scan() {
 
     if (running) return;
@@ -962,23 +1099,27 @@ async function scan() {
         Math.min(100,Number($("limit").value)||5)
     );
 
+    const parallel = Math.max(
+        1,
+        Math.min(10,Number($("parallel").value)||3)
+    );
+
     let checked = 0;
+    let activeCount = 0;
+    let pending = [];   // { candidate, position, missingWord }
 
     status("اسکن شروع شد...");
 
     try {
 
-        while (
-            cursor.position < 12 &&
-            checked < limit &&
-            !stopFlag
-        ) {
+        /* پر کردن صف اولیه با عبارت‌های معتبر */
+        while (pending.length < parallel && checked < limit && !stopFlag) {
+
+            if (cursor.position >= 12) break;
 
             if (cursor.index >= 2048) {
-
                 cursor.position++;
                 cursor.index = 0;
-
                 saveCursor(cursor);
                 continue;
             }
@@ -1005,252 +1146,135 @@ async function scan() {
             cursor.valid++;
             checked++;
 
-            status(
-                "عبارت معتبر شماره: "+cursor.valid+
-                "\nجایگاه در حال بررسی: "+(cursor.position+1)+
-                "\nدر حال بررسی شبکه‌ها..."
-            );
-
-            const mnemonic = candidate.join(" ");
-
-            const seed = mnemonicToSeedSync(mnemonic);
-
-            const addresses = {
-
-                ...bitcoinAddresses(seed),
-
-                ETH:evmAddress(seed),
-
-                BNB:evmAddress(seed),
-
-                TRON:tronAddress(seed)
-
-            };
-
-            const result = {
-                addresses,
-                checks:{}
-            };
-
-
-            /* ===== USDC (قابلیت جدید ۱ و ۲) =====
-               همه شبکه‌های USDC با هم و موازی چک می‌شوند
-               و همزمان با بقیه بررسی‌ها اجرا می‌شوند */
-            const usdcPromise = checkUSDC_NETWORKS(addresses);
-
-
-            /* BTC */
-
-            for (const network of [
-                "BTC_Legacy",
-                "BTC_NestedSegWit",
-                "BTC_NativeSegWit"
-            ]) {
-
-                if (stopFlag) break;
-
-                try {
-                    result.checks[network] =
-                        await checkBTC(addresses[network]);
-                } catch(error) {
-                    result.checks[network] = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await sleep(500);
-            }
-
-
-            /* ETH */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.ETH =
-                        await checkEVM(
-                            "https://ethereum-rpc.publicnode.com",
-                            addresses.ETH
-                        );
-                } catch(error) {
-                    result.checks.ETH = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await sleep(500);
-            }
-
-
-            /* USDT ERC20 */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.USDT_ERC20 =
-                        await checkUSDT_EVM(
-                            "https://ethereum-rpc.publicnode.com",
-                            addresses.ETH,
-                            "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-                            6
-                        );
-                } catch(error) {
-                    result.checks.USDT_ERC20 = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await sleep(500);
-            }
-
-
-            /* BNB */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.BNB =
-                        await checkEVM(
-                            "https://bsc-rpc.publicnode.com",
-                            addresses.BNB
-                        );
-                } catch(error) {
-                    result.checks.BNB = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await sleep(500);
-            }
-
-
-            /* USDT BEP20 */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.USDT_BEP20 =
-                        await checkUSDT_EVM(
-                            "https://bsc-rpc.publicnode.com",
-                            addresses.BNB,
-                            "0x55d398326f99059fF775485246999027B3197955",
-                            18
-                        );
-                } catch(error) {
-                    result.checks.USDT_BEP20 = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await sleep(500);
-            }
-
-
-            /* TRON and USDT TRC20 */
-
-            if (!stopFlag) {
-
-                try {
-
-                    result.checks.TRON =
-                        await checkTRON(addresses.TRON);
-
-                    result.checks.USDT_TRC20 =
-                        checkTRON_USDT(result.checks.TRON);
-
-                } catch(error) {
-
-                    result.checks.TRON = {
-                        error:String(error.message||error)
-                    };
-
-                    result.checks.USDT_TRC20 = {
-                        error:String(error.message||error)
-                    };
-                }
-            }
-
-
-            /* ===== USDC (قابلیت جدید ۱) =====
-               نتیجه موازی USDC را در checks قرار می‌دهیم */
-            const usdcChecks = await usdcPromise;
-
-            for (const [name,data] of Object.entries(usdcChecks)) {
-                result.checks[name] = data;
-            }
-
-
-            /* Save only positive assets */
-
-            const assets = getPositiveAssets(result);
-
-            if (Object.keys(assets).length > 0) {
-
-                const found = {
-
-                    missing_word:
-                    candidate[cursor.position],
-
-                    missing_position:
-                    cursor.position+1,
-
-                    assets:assets,
-
-                    found_at:
-                    new Date().toISOString()
-
-                };
-
-                results.push(found);
-
-                saveResults();
-
-                render();
-
-                status(
-                    "دارایی پیدا شد!\n"+
-                    "کلمه گمشده: "+found.missing_word+
-                    "\nجایگاه کلمه: "+found.missing_position
-                );
-
-            }
-
-            /* Move cursor after this candidate is checked */
+            pending.push({
+                candidate,
+                position: cursor.position,
+                missingWord: candidate[cursor.position]
+            });
 
             cursor.index++;
             saveCursor(cursor);
-
-            candidate.fill("");
-
-            await sleep(500);
         }
 
+        /* اجرای موازی همه عبارت‌های صف */
+        while (pending.length > 0 && !stopFlag) {
 
-        if (cursor.position >= 12) {
-
-            status("بررسی تمام جایگاه‌ها پایان یافت.");
-
-        } else if (stopFlag) {
-
-            status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
-
-        } else {
+            const batch = pending.splice(0, parallel);
+            activeCount = batch.length;
 
             status(
-                "این نوبت تمام شد.\n"+
-                checked+
-                " عبارت معتبر بررسی شد.\n"+
+                "عبارت معتبر شماره: " + cursor.valid +
+                "\nدر حال بررسی " + activeCount + " عبارت همزمان..." +
+                "\n(بررسی‌شده تا اینجا: " + checked + ")"
+            );
+
+            const tasks = batch.map(item => {
+
+                const mnemonic = item.candidate.join(" ");
+
+                return checkOneCandidate(mnemonic).then(result => ({
+                    item,
+                    result
+                }));
+
+            });
+
+            const settled = await Promise.allSettled(tasks);
+
+            for (const s of settled) {
+
+                if (s.status !== "fulfilled") continue;
+
+                const { item, result } = s.value;
+
+                const assets = getPositiveAssets(result);
+
+                if (Object.keys(assets).length > 0) {
+
+                    const found = {
+                        missing_word: item.missingWord,
+                        missing_position: item.position + 1,
+                        assets: assets,
+                        found_at: new Date().toISOString()
+                    };
+
+                    results.push(found);
+                    saveResults();
+                    render();
+
+                    status(
+                        "دارایی پیدا شد!\n" +
+                        "کلمه گمشده: " + found.missing_word +
+                        "\nجایگاه کلمه: " + found.missing_position
+                    );
+                }
+            }
+
+            /* پر کردن مجدد صف تا سقف parallel */
+            while (pending.length < parallel && checked < limit && !stopFlag) {
+
+                if (cursor.position >= 12) break;
+
+                if (cursor.index >= 2048) {
+                    cursor.position++;
+                    cursor.index = 0;
+                    saveCursor(cursor);
+                    continue;
+                }
+
+                const candidate = words.slice();
+
+                candidate.splice(
+                    cursor.position,
+                    0,
+                    wordlist[cursor.index]
+                );
+
+                if (
+                    !validateMnemonic(
+                        candidate.join(" "),
+                        wordlist
+                    )
+                ) {
+                    cursor.index++;
+                    saveCursor(cursor);
+                    continue;
+                }
+
+                cursor.valid++;
+                checked++;
+
+                pending.push({
+                    candidate,
+                    position: cursor.position,
+                    missingWord: candidate[cursor.position]
+                });
+
+                cursor.index++;
+                saveCursor(cursor);
+            }
+
+            await sleep(100);
+        }
+
+        if (cursor.position >= 12) {
+            status("بررسی تمام جایگاه‌ها پایان یافت.");
+        } else if (stopFlag) {
+            status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
+        } else {
+            status(
+                "این نوبت تمام شد.\n" +
+                checked +
+                " عبارت معتبر بررسی شد.\n" +
                 "برای ادامه دوباره شروع را بزن."
             );
         }
 
-    } catch(error) {
-
+    } catch (error) {
         status(
-            "خطا: "+String(error.message||error)+
+            "خطا: " + String(error.message || error) +
             "\nپیشرفت ذخیره شده است."
         );
-
     } finally {
         running = false;
     }
