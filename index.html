@@ -89,9 +89,9 @@ button {
 <textarea id="words" rows="4"
 placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></textarea>
 
-<h3>۲. تعداد عبارت معتبر در هر نوبت</h3>
+<h3>۲. تعداد عبارت معتبر در هر نوبت (حداکثر ۵۰۰)</h3>
 
-<input id="limit" type="number" value="5" min="1" max="100">
+<input id="limit" type="number" value="5" min="1" max="500">
 
 <button id="start">شروع / ادامه اسکن</button>
 <button id="stop" class="stop">توقف اسکن</button>
@@ -142,12 +142,27 @@ import {
     secp256k1
 } from "https://esm.sh/@noble/curves@1.4.0/secp256k1";
 
+import {
+    ed25519
+} from "https://esm.sh/@noble/curves@1.4.0/ed25519";
+
+import {
+    base58 as base58Sol
+} from "https://esm.sh/@scure/base@1.1.7";
+
 
 const $ = id => document.getElementById(id);
 
 let stopFlag = false;
 let running = false;
 let results = [];
+
+// حداکثر تعداد بررسی در هر نوبت
+const MAX_LIMIT = 500;
+
+// بازه تاخیر تصادفی (میلی‌ثانیه)
+const DELAY_MIN_MS = 1000;
+const DELAY_MAX_MS = 4000;
 
 try {
     results = JSON.parse(
@@ -159,6 +174,14 @@ try {
 
 function status(text) {
     $("status").textContent = text;
+}
+
+// تاخیر تصادفی بین درخواست‌ها
+function randomDelay() {
+    const ms = Math.floor(
+        Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS + 1)
+    ) + DELAY_MIN_MS;
+    return new Promise(r => setTimeout(r, ms));
 }
 
 function concat(...arrays) {
@@ -436,6 +459,62 @@ function tronAddress(seed) {
 }
 
 
+/* Solana (Ed25519 / SLIP-0010) */
+
+function solanaAddress(seed) {
+
+    // مسیر استاندارد سولانا (Phantom / Solflare):
+    // m/44'/501'/0'/0'
+    // برای سولانا از derivation سخت‌شده (hardened) استفاده می‌شود.
+    const path = [44, 501, 0, 0];
+    const HARDENED = 0x80000000;
+
+    // master key
+    let hmacKey = seed;
+    let I = hmacSHA512(
+        new TextEncoder().encode("ed25519 seed"),
+        seed
+    );
+
+    let key = I.slice(0, 32);
+    let chain = I.slice(32, 64);
+
+    for (const index of path) {
+        const idx = index | HARDENED;
+        const data = new Uint8Array(37);
+        data[0] = 0;
+        data.set(key, 1);
+        data[36] = (idx >>> 24) & 0xff;
+        data[35] = (idx >>> 16) & 0xff;
+        data[34] = (idx >>> 8) & 0xff;
+        data[33] = idx & 0xff;
+
+        const out = hmacSHA512(chain, data);
+        key = out.slice(0, 32);
+        chain = out.slice(32, 64);
+    }
+
+    const pub = ed25519.getPublicKey(key);
+
+    return base58Sol.encode(pub);
+}
+
+
+/* HMAC-SHA512 (پیاده‌سازی سبک برای نیاز سولانا) */
+
+async function hmacSHA512(key, message) {
+    const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        key,
+        { name: "HMAC", hash: "SHA-512" },
+        false,
+        ["sign"]
+    );
+    const sig = await crypto.subtle.sign("HMAC", cryptoKey, message);
+    return new Uint8Array(sig);
+}
+
+
 /* Network APIs */
 
 async function fetchJSON(url,options={}) {
@@ -568,89 +647,6 @@ async function checkUSDT_EVM(url,address,contract,decimals) {
 }
 
 
-/* ===== USDC (قابلیت جدید ۱) ===== */
-
-const USDC_NETWORKS = {
-
-    USDC_ERC20: {
-        rpc: "https://ethereum-rpc.publicnode.com",
-        contract: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        decimals: 6,
-        addressKey: "ETH"
-    },
-
-    USDC_BEP20: {
-        rpc: "https://bsc-rpc.publicnode.com",
-        contract: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-        decimals: 18,
-        addressKey: "BNB"
-    },
-
-    USDC_Polygon: {
-        rpc: "https://polygon-bor-rpc.publicnode.com",
-        contract: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-        decimals: 6,
-        addressKey: "ETH"
-    },
-
-    USDC_Arbitrum: {
-        rpc: "https://arbitrum-one-rpc.publicnode.com",
-        contract: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-        decimals: 6,
-        addressKey: "ETH"
-    },
-
-    USDC_Optimism: {
-        rpc: "https://optimism-rpc.publicnode.com",
-        contract: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-        decimals: 6,
-        addressKey: "ETH"
-    },
-
-    USDC_Base: {
-        rpc: "https://base-rpc.publicnode.com",
-        contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        decimals: 6,
-        addressKey: "ETH"
-    },
-
-    USDC_Avalanche: {
-        rpc: "https://avalanche-c-chain-rpc.publicnode.com",
-        contract: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
-        decimals: 6,
-        addressKey: "ETH"
-    }
-
-};
-
-async function checkUSDC_NETWORKS(addresses) {
-
-    const entries = Object.entries(USDC_NETWORKS);
-
-    const checks = {};
-
-    // اجرای موازی همه شبکه‌های USDC (قابلیت جدید ۲ - سرعت)
-    const jobs = entries.map(([name,cfg]) =>
-        checkUSDT_EVM(
-            cfg.rpc,
-            addresses[cfg.addressKey],
-            cfg.contract,
-            cfg.decimals
-        )
-        .then(data => { checks[name] = data; })
-        .catch(error => {
-            checks[name] = {
-                error: String(error.message || error)
-            };
-        })
-    );
-
-    await Promise.allSettled(jobs);
-
-    return checks;
-}
-
-
 /* TRON account and TRC20 USDT */
 
 const USDT_TRON_CONTRACT =
@@ -700,6 +696,41 @@ function checkTRON_USDT(tronData) {
     return {
         raw:"0",
         balance:0
+    };
+}
+
+
+/* Solana RPC */
+
+const SOLANA_RPC =
+"https://api.mainnet-beta.solana.com";
+
+async function checkSOL(address) {
+
+    const data = await fetchJSON(SOLANA_RPC,{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            jsonrpc:"2.0",
+            id:1,
+            method:"getBalance",
+            params:[address,{ commitment:"confirmed" }]
+        })
+    });
+
+    if (data.error) {
+        throw Error(data.error.message || "RPC error");
+    }
+
+    const lamports = data.result && data.result.value
+        ? data.result.value
+        : 0;
+
+    return {
+        balance_lamports: String(lamports),
+        balance_SOL: Number(lamports) / 1e9
     };
 }
 
@@ -760,6 +791,21 @@ function getPositiveAssets(result) {
             }
         }
 
+        if (network === "SOL") {
+
+            const balance = Number(
+                data.balance_lamports || 0
+            );
+
+            if (balance > 0) {
+
+                positive[network] = {
+                    address:result.addresses[network],
+                    balance_SOL:data.balance_SOL
+                };
+            }
+        }
+
         if (network.startsWith("USDT_")) {
 
             const balance = Number(data.balance || 0);
@@ -775,23 +821,6 @@ function getPositiveAssets(result) {
                         : "BNB"
                     ],
                     balance_USDT:balance
-                };
-            }
-        }
-
-        /* ===== USDC (قابلیت جدید ۱) ===== */
-        if (network.startsWith("USDC_")) {
-
-            const balance = Number(data.balance || 0);
-
-            if (balance > 0) {
-
-                const key =
-                    USDC_NETWORKS[network].addressKey;
-
-                positive[network] = {
-                    address:result.addresses[key],
-                    balance_USDC:balance
                 };
             }
         }
@@ -900,15 +929,14 @@ function render() {
                     "موجودی TRX: " + asset.balance_TRX;
             }
 
+            if (network === "SOL") {
+                balance.textContent =
+                    "موجودی SOL: " + asset.balance_SOL;
+            }
+
             if (network.startsWith("USDT_")) {
                 balance.textContent =
                     "موجودی USDT: " + asset.balance_USDT;
-            }
-
-            /* ===== USDC (قابلیت جدید ۱) ===== */
-            if (network.startsWith("USDC_")) {
-                balance.textContent =
-                    "موجودی USDC: " + asset.balance_USDC;
             }
 
             section.appendChild(name);
@@ -959,7 +987,7 @@ async function scan() {
 
     const limit = Math.max(
         1,
-        Math.min(100,Number($("limit").value)||5)
+        Math.min(MAX_LIMIT, Number($("limit").value)||5)
     );
 
     let checked = 0;
@@ -1023,7 +1051,9 @@ async function scan() {
 
                 BNB:evmAddress(seed),
 
-                TRON:tronAddress(seed)
+                TRON:tronAddress(seed),
+
+                SOL: solanaAddress(seed)
 
             };
 
@@ -1031,12 +1061,6 @@ async function scan() {
                 addresses,
                 checks:{}
             };
-
-
-            /* ===== USDC (قابلیت جدید ۱ و ۲) =====
-               همه شبکه‌های USDC با هم و موازی چک می‌شوند
-               و همزمان با بقیه بررسی‌ها اجرا می‌شوند */
-            const usdcPromise = checkUSDC_NETWORKS(addresses);
 
 
             /* BTC */
@@ -1058,7 +1082,7 @@ async function scan() {
                     };
                 }
 
-                await sleep(500);
+                await randomDelay();
             }
 
 
@@ -1078,7 +1102,7 @@ async function scan() {
                     };
                 }
 
-                await sleep(500);
+                await randomDelay();
             }
 
 
@@ -1100,7 +1124,7 @@ async function scan() {
                     };
                 }
 
-                await sleep(500);
+                await randomDelay();
             }
 
 
@@ -1120,7 +1144,7 @@ async function scan() {
                     };
                 }
 
-                await sleep(500);
+                await randomDelay();
             }
 
 
@@ -1142,7 +1166,7 @@ async function scan() {
                     };
                 }
 
-                await sleep(500);
+                await randomDelay();
             }
 
 
@@ -1168,15 +1192,25 @@ async function scan() {
                         error:String(error.message||error)
                     };
                 }
+
+                await randomDelay();
             }
 
 
-            /* ===== USDC (قابلیت جدید ۱) =====
-               نتیجه موازی USDC را در checks قرار می‌دهیم */
-            const usdcChecks = await usdcPromise;
+            /* SOL (Solana) */
 
-            for (const [name,data] of Object.entries(usdcChecks)) {
-                result.checks[name] = data;
+            if (!stopFlag) {
+
+                try {
+                    result.checks.SOL =
+                        await checkSOL(addresses.SOL);
+                } catch(error) {
+                    result.checks.SOL = {
+                        error:String(error.message||error)
+                    };
+                }
+
+                await randomDelay();
             }
 
 
@@ -1222,7 +1256,7 @@ async function scan() {
 
             candidate.fill("");
 
-            await sleep(500);
+            await randomDelay();
         }
 
 
@@ -1309,10 +1343,10 @@ $("csv").onclick = () => {
                 balance = asset.balance_native;
             } else if (network === "TRON") {
                 balance = asset.balance_TRX;
+            } else if (network === "SOL") {
+                balance = asset.balance_SOL;
             } else if (network.startsWith("USDT_")) {
                 balance = asset.balance_USDT;
-            } else if (network.startsWith("USDC_")) {
-                balance = asset.balance_USDC;
             }
 
             rows.push([
