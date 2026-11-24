@@ -67,6 +67,11 @@ button {
     color: #667085;
     line-height: 1.7;
 }
+.row {
+    display: flex;
+    gap: 10px;
+}
+.row > div { flex: 1; }
 </style>
 </head>
 
@@ -89,9 +94,22 @@ button {
 <textarea id="words" rows="4"
 placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></textarea>
 
-<h3>۲. تعداد عبارت معتبر در هر نوبت (حداکثر ۵۰۰)</h3>
+<h3>۲. تنظیمات</h3>
 
+<div class="row">
+<div>
+<label class="small">تعداد عبارت معتبر در هر نوبت (۱ تا ۵۰۰)</label>
 <input id="limit" type="number" value="5" min="1" max="500">
+</div>
+<div>
+<label class="small">حداقل تاخیر بین درخواست‌ها (میلی‌ثانیه)</label>
+<input id="delayMin" type="number" value="2000" min="500" max="60000" step="100">
+</div>
+<div>
+<label class="small">حداکثر تاخیر بین درخواست‌ها (میلی‌ثانیه)</label>
+<input id="delayMax" type="number" value="5000" min="1000" max="120000" step="100">
+</div>
+</div>
 
 <button id="start">شروع / ادامه اسکن</button>
 <button id="stop" class="stop">توقف اسکن</button>
@@ -105,8 +123,8 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <div id="results"></div>
 
 <p class="small">
-این نسخه اولین آدرس استاندارد را برای هر شبکه بررسی می‌کند.
-بررسی شبکه‌ها به صورت موازی انجام می‌شود.
+در صورت خطای 429 / rate-limit، تاخیر به‌طور خودکار افزایش می‌یابد
+(تا حداکثر ۳۰ ثانیه) و پس از موفقیت‌های پیاپی به‌تدریج کاهش می‌یابد.
 </p>
 
 </main>
@@ -158,6 +176,80 @@ let running = false;
 let results = [];
 
 const MAX_LIMIT = 500;
+
+/* ============ تاخیر تطبیقی ============ */
+
+// ضریب افزایش در صورت خطا
+const BACKOFF_FACTOR  = 1.8;
+// حداکثر تاخیر مطلق (میلی‌ثانیه)
+const BACKOFF_MAX_MS  = 30000;
+// پس از چند موفقیت پیاپی، ضریب کاهش یابد
+const RECOVER_AFTER   = 5;
+// ضریب کاهش در هر بار recovery
+const RECOVER_FACTOR  = 0.85;
+
+let adaptiveDelayMs   = 0;   // افزایش انباشته به مقدار پایه
+let consecutiveOK     = 0;
+
+function getBaseDelayRange() {
+    let mn = Number($("delayMin").value) || 2000;
+    let mx = Number($("delayMax").value) || 5000;
+    if (mn < 100)  mn = 100;
+    if (mx < mn)   mx = mn;
+    return { mn, mx };
+}
+
+function currentDelayRange() {
+    const { mn, mx } = getBaseDelayRange();
+    return {
+        mn: Math.min(mn + adaptiveDelayMs, BACKOFF_MAX_MS),
+        mx: Math.min(mx + adaptiveDelayMs, BACKOFF_MAX_MS * 1.5)
+    };
+}
+
+async function adaptiveDelay() {
+    const { mn, mx } = currentDelayRange();
+    const ms = Math.floor(Math.random() * (mx - mn + 1)) + mn;
+    await new Promise(r => setTimeout(r, ms));
+}
+
+function onRequestSuccess() {
+    consecutiveOK++;
+    if (consecutiveOK >= RECOVER_AFTER && adaptiveDelayMs > 0) {
+        adaptiveDelayMs = Math.floor(adaptiveDelayMs * RECOVER_FACTOR);
+        if (adaptiveDelayMs < 100) adaptiveDelayMs = 0;
+        consecutiveOK = 0;
+    }
+}
+
+function onRequestError(err) {
+    consecutiveOK = 0;
+    const msg = String(err && (err.message || err)).toLowerCase();
+    const isRateLimit =
+        msg.includes("429") ||
+        msg.includes("rate") ||
+        msg.includes("too many") ||
+        msg.includes("limit") ||
+        msg.includes("timeout") ||
+        msg.includes("abort");
+
+    if (isRateLimit) {
+        if (adaptiveDelayMs === 0) {
+            const { mx } = getBaseDelayRange();
+            adaptiveDelayMs = mx;
+        } else {
+            adaptiveDelayMs = Math.floor(
+                adaptiveDelayMs * BACKOFF_FACTOR
+            );
+        }
+        if (adaptiveDelayMs > BACKOFF_MAX_MS) {
+            adaptiveDelayMs = BACKOFF_MAX_MS;
+        }
+    }
+}
+
+/* ========================================= */
+
 
 try {
     results = JSON.parse(
@@ -505,7 +597,7 @@ async function fetchJSON(url,options={}) {
 
     const timeout = setTimeout(
         ()=>controller.abort(),
-        15000
+        20000
     );
 
     try {
@@ -724,13 +816,11 @@ async function checkSOL(address) {
     };
 }
 
-/* USDC SPL — mint رسمی Circle */
 const USDC_SOL_MINT =
 "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 async function checkUSDC_SOL(ownerAddress) {
 
-    // پیدا کردن همه توکن‌اکانت‌های SPL این مالک
     const accounts = await solanaRPC(
         "getTokenAccountsByOwner",
         [
@@ -753,7 +843,6 @@ async function checkUSDC_SOL(ownerAddress) {
         }
     }
 
-    // USDC شش رقم اعشار دارد
     return {
         raw: totalRaw.toString(),
         balance: Number(totalRaw) / 1e6
@@ -844,8 +933,6 @@ function getPositiveAssets(result) {
                 else if (network === "USDT_BEP20" ||
                          network === "USDC_BEP20") addrKey = "BNB";
                 else if (network === "USDC_SOL") addrKey = "SOL";
-                else if (network === "USDT_ERC20" ||
-                         network === "USDC_ERC20") addrKey = "ETH";
 
                 const entry = {
                     address: result.addresses[addrKey]
@@ -1001,6 +1088,10 @@ async function scan() {
     running = true;
     stopFlag = false;
 
+    // reset adaptive delay at start of each run
+    adaptiveDelayMs = 0;
+    consecutiveOK = 0;
+
     const words = $("words")
         .value
         .trim()
@@ -1070,10 +1161,17 @@ async function scan() {
             cursor.valid++;
             checked++;
 
+            const { mn, mx } = currentDelayRange();
+
             status(
                 "عبارت معتبر شماره: "+cursor.valid+
                 "\nجایگاه در حال بررسی: "+(cursor.position+1)+
-                "\nدر حال بررسی موازی شبکه‌ها..."
+                "\nبررسی موازی شبکه‌ها با تاخیر "+
+                mn+"–"+mx+" ms"+
+                (adaptiveDelayMs > 0
+                    ? "\n⚠ افزایش تاخیر خودکار: +"+
+                      adaptiveDelayMs+" ms"
+                    : "")
             );
 
             const mnemonic = candidate.join(" ");
@@ -1098,65 +1196,78 @@ async function scan() {
             const USDC_BEP20 = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 
             const checks = {};
-            const tasks = [];
+
+            /* ---------------------------------------------------
+               هر تسک قبل از اجرا، تاخیر تصادفی را می‌گیرد
+               و پس از اجرا نتیجه را در checks می‌نویسد.
+               خطاها باعث افزایش خودکار تاخیر می‌شوند.
+            --------------------------------------------------- */
 
             const wrap = (name, fn) => {
-                tasks.push(
-                    fn()
-                        .then(v => { checks[name] = v; })
-                        .catch(e => {
-                            checks[name] = {
-                                error: String(e.message || e)
-                            };
-                        })
-                );
+                return (async () => {
+                    if (stopFlag) {
+                        checks[name] = { error: "stopped" };
+                        return;
+                    }
+                    await adaptiveDelay();
+                    try {
+                        const v = await fn();
+                        checks[name] = v;
+                        onRequestSuccess();
+                    } catch (e) {
+                        checks[name] = {
+                            error: String(e && (e.message || e))
+                        };
+                        onRequestError(e);
+                    }
+                })();
             };
 
-            /* --- همه شبکه‌ها به صورت موازی --- */
+            const tasks = [];
 
-            wrap("BTC_Legacy",
-                () => checkBTC(addresses.BTC_Legacy));
+            tasks.push(wrap("BTC_Legacy",
+                () => checkBTC(addresses.BTC_Legacy)));
 
-            wrap("BTC_NestedSegWit",
-                () => checkBTC(addresses.BTC_NestedSegWit));
+            tasks.push(wrap("BTC_NestedSegWit",
+                () => checkBTC(addresses.BTC_NestedSegWit)));
 
-            wrap("BTC_NativeSegWit",
-                () => checkBTC(addresses.BTC_NativeSegWit));
+            tasks.push(wrap("BTC_NativeSegWit",
+                () => checkBTC(addresses.BTC_NativeSegWit)));
 
-            wrap("ETH",
-                () => checkEVM(ETH_RPC, addresses.ETH));
+            tasks.push(wrap("ETH",
+                () => checkEVM(ETH_RPC, addresses.ETH)));
 
-            wrap("USDT_ERC20",
+            tasks.push(wrap("USDT_ERC20",
                 () => checkToken_EVM(
                     ETH_RPC, addresses.ETH, USDT_ERC20, 6
-                ));
+                )));
 
-            wrap("USDC_ERC20",
+            tasks.push(wrap("USDC_ERC20",
                 () => checkToken_EVM(
                     ETH_RPC, addresses.ETH, USDC_ERC20, 6
-                ));
+                )));
 
-            wrap("BNB",
-                () => checkEVM(BSC_RPC, addresses.BNB));
+            tasks.push(wrap("BNB",
+                () => checkEVM(BSC_RPC, addresses.BNB)));
 
-            wrap("USDT_BEP20",
+            tasks.push(wrap("USDT_BEP20",
                 () => checkToken_EVM(
                     BSC_RPC, addresses.BNB, USDT_BEP20, 18
-                ));
+                )));
 
-            wrap("USDC_BEP20",
+            tasks.push(wrap("USDC_BEP20",
                 () => checkToken_EVM(
                     BSC_RPC, addresses.BNB, USDC_BEP20, 18
-                ));
+                )));
 
-            wrap("TRON",
-                () => checkTRON(addresses.TRON));
+            tasks.push(wrap("TRON",
+                () => checkTRON(addresses.TRON)));
 
-            wrap("SOL",
-                () => checkSOL(addresses.SOL));
+            tasks.push(wrap("SOL",
+                () => checkSOL(addresses.SOL)));
 
-            wrap("USDC_SOL",
-                () => checkUSDC_SOL(addresses.SOL));
+            tasks.push(wrap("USDC_SOL",
+                () => checkUSDC_SOL(addresses.SOL)));
 
             await Promise.all(tasks);
 
@@ -1173,31 +1284,19 @@ async function scan() {
 
             const result = { addresses, checks };
 
-            /* Save only positive assets */
-
             const assets = getPositiveAssets(result);
 
             if (Object.keys(assets).length > 0) {
 
                 const found = {
-
-                    missing_word:
-                    candidate[cursor.position],
-
-                    missing_position:
-                    cursor.position+1,
-
-                    assets:assets,
-
-                    found_at:
-                    new Date().toISOString()
-
+                    missing_word: candidate[cursor.position],
+                    missing_position: cursor.position+1,
+                    assets: assets,
+                    found_at: new Date().toISOString()
                 };
 
                 results.push(found);
-
                 saveResults();
-
                 render();
 
                 status(
@@ -1205,17 +1304,13 @@ async function scan() {
                     "کلمه گمشده: "+found.missing_word+
                     "\nجایگاه کلمه: "+found.missing_position
                 );
-
             }
 
             cursor.index++;
             saveCursor(cursor);
 
             candidate.fill("");
-
-            /* بدون تاخیر بین عبارت‌ها — ادامه سریع */
         }
-
 
         if (cursor.position >= 12) {
 
