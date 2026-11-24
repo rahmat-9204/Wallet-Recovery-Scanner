@@ -44,8 +44,8 @@ button { border: 0; background: #1556b8; color: white; font-weight: bold; cursor
 <h3>۲. تعداد عبارت معتبر در هر نوبت (۱۰ تا ۵۰۰)</h3>
 <input id="limit" type="number" value="10" min="10" max="500">
 
-<h3>۳. تاخیر بین عبارت‌ها (میلی‌ثانیه، ۵۰۰ تا ۲۵۰۰)</h3>
-<input id="delay" type="number" value="500" min="500" max="2500">
+<h3>۳. تاخیر بین عبارت‌ها (میلی‌ثانیه، ۵۰۰ تا ۵۰۰۰)</h3>
+<input id="delay" type="number" value="500" min="500" max="5000">
 
 <h3>۴. کلید API ترون‌گرید (اختیاری، برای جلوگیری از محدودیت نرخ)</h3>
 <input id="tronApiKey" type="text" placeholder="TRON-PRO-API-KEY (اختیاری)">
@@ -74,9 +74,8 @@ button { border: 0; background: #1556b8; color: white; font-weight: bold; cursor
 <div id="emptyListEmpty" class="empty-note">هنوز عبارت بدون موجودی ثبت نشده است.</div>
 
 <p class="small">
-این نسخه اولین آدرس استاندارد هر شبکه را بررسی می‌کند.
-TRX، USDT (ERC20/BEP20/TRC20)، USDC (ERC20/BEP20/Polygon/Arbitrum/Optimism/Base/Avalanche)، BTC (Legacy/Nested/Native SegWit)، ETH و BNB.
-هر عبارت معتبر (چه دارای موجودی، چه بدون موجودی) در تاریخچه ثبت می‌شود.
+BTC (Legacy/Nested/Native SegWit)، ETH، BNB، TRX، USDT (ERC20/BEP20/TRC20)، USDC (ERC20/BEP20/Polygon/Arbitrum/Optimism/Base/Avalanche).
+توجه: آدرس TRON برای «فعال شدن» به حداقل ۰.۱ TRX نیاز دارد. اگر موجودی شما کمتر از این مقدار باشد، ممکن است API اطلاعاتی برنگرداند.
 </p>
 </main>
 
@@ -90,7 +89,7 @@ import { keccak_256 } from "https://esm.sh/@noble/hashes@1.5.0/sha3";
 import { secp256k1 } from "https://esm.sh/@noble/curves@1.4.0/secp256k1";
 
 const $ = id => document.getElementById(id);
-const LIMIT_MIN = 10, LIMIT_MAX = 500, DELAY_MIN = 500, DELAY_MAX = 2500;
+const LIMIT_MIN = 10, LIMIT_MAX = 500, DELAY_MIN = 500, DELAY_MAX = 5000;
 let stopFlag = false, running = false;
 let history = [];
 try { history = JSON.parse(localStorage.getItem("wrs_history") || "[]"); } catch { history = []; }
@@ -178,7 +177,7 @@ function tronAddress(seed) {
 let RPC_ID = 0;
 async function fetchJSON(url,options={}) {
     const controller = new AbortController();
-    const timeout = setTimeout(()=>controller.abort(), 15000);
+    const timeout = setTimeout(()=>controller.abort(), 20000);
     try {
         const response = await fetch(url,{...options, signal:controller.signal});
         if (!response.ok) { const err = Error("HTTP "+response.status); err.status = response.status; throw err; }
@@ -232,7 +231,7 @@ async function checkUSDC_NETWORKS(addresses) {
 
 const USDT_TRON_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
-async function fetchTronAccount(address, retries = 3) {
+async function fetchTronAccount(address, retries = 4) {
     const apiKey = $("tronApiKey").value.trim();
     const headers = { "accept": "application/json" };
     if (apiKey) headers["TRON-PRO-API-KEY"] = apiKey;
@@ -240,7 +239,11 @@ async function fetchTronAccount(address, retries = 3) {
         try {
             return await fetchJSON("https://api.trongrid.io/v1/accounts/" + encodeURIComponent(address), { headers });
         } catch (e) {
-            if (e.status === 429 || e.status === 403) { await new Promise(r => setTimeout(r, 2000 * (attempt + 1))); continue; }
+            if (e.status === 429 || e.status === 403) {
+                const wait = Math.min(5000, 2000 * (attempt + 1));
+                await new Promise(r => setTimeout(r, wait));
+                continue;
+            }
             throw e;
         }
     }
