@@ -105,8 +105,8 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <div id="results"></div>
 
 <p class="small">
-این نسخه اولین آدرس استاندارد را بررسی می‌کند.
-آدرس‌های بعدی، مسیرهای سفارشی و تمام توکن‌ها هنوز بررسی نمی‌شوند.
+این نسخه اولین آدرس استاندارد را برای هر شبکه بررسی می‌کند.
+بررسی شبکه‌ها به صورت موازی انجام می‌شود.
 </p>
 
 </main>
@@ -157,12 +157,7 @@ let stopFlag = false;
 let running = false;
 let results = [];
 
-// حداکثر تعداد بررسی در هر نوبت
 const MAX_LIMIT = 500;
-
-// بازه تاخیر تصادفی (میلی‌ثانیه)
-const DELAY_MIN_MS = 1000;
-const DELAY_MAX_MS = 4000;
 
 try {
     results = JSON.parse(
@@ -174,14 +169,6 @@ try {
 
 function status(text) {
     $("status").textContent = text;
-}
-
-// تاخیر تصادفی بین درخواست‌ها
-function randomDelay() {
-    const ms = Math.floor(
-        Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS + 1)
-    ) + DELAY_MIN_MS;
-    return new Promise(r => setTimeout(r, ms));
 }
 
 function concat(...arrays) {
@@ -459,48 +446,7 @@ function tronAddress(seed) {
 }
 
 
-/* Solana (Ed25519 / SLIP-0010) */
-
-function solanaAddress(seed) {
-
-    // مسیر استاندارد سولانا (Phantom / Solflare):
-    // m/44'/501'/0'/0'
-    // برای سولانا از derivation سخت‌شده (hardened) استفاده می‌شود.
-    const path = [44, 501, 0, 0];
-    const HARDENED = 0x80000000;
-
-    // master key
-    let hmacKey = seed;
-    let I = hmacSHA512(
-        new TextEncoder().encode("ed25519 seed"),
-        seed
-    );
-
-    let key = I.slice(0, 32);
-    let chain = I.slice(32, 64);
-
-    for (const index of path) {
-        const idx = index | HARDENED;
-        const data = new Uint8Array(37);
-        data[0] = 0;
-        data.set(key, 1);
-        data[36] = (idx >>> 24) & 0xff;
-        data[35] = (idx >>> 16) & 0xff;
-        data[34] = (idx >>> 8) & 0xff;
-        data[33] = idx & 0xff;
-
-        const out = hmacSHA512(chain, data);
-        key = out.slice(0, 32);
-        chain = out.slice(32, 64);
-    }
-
-    const pub = ed25519.getPublicKey(key);
-
-    return base58Sol.encode(pub);
-}
-
-
-/* HMAC-SHA512 (پیاده‌سازی سبک برای نیاز سولانا) */
+/* HMAC-SHA512 */
 
 async function hmacSHA512(key, message) {
     const cryptoKey = await crypto.subtle.importKey(
@@ -512,6 +458,42 @@ async function hmacSHA512(key, message) {
     );
     const sig = await crypto.subtle.sign("HMAC", cryptoKey, message);
     return new Uint8Array(sig);
+}
+
+
+/* Solana (Ed25519 / SLIP-0010) — async */
+
+async function solanaAddress(seed) {
+
+    const path = [44, 501, 0, 0];
+    const HARDENED = 0x80000000;
+
+    let I = await hmacSHA512(
+        new TextEncoder().encode("ed25519 seed"),
+        seed
+    );
+
+    let key = I.slice(0, 32);
+    let chain = I.slice(32, 64);
+
+    for (const index of path) {
+        const idx = (index | HARDENED) >>> 0;
+        const data = new Uint8Array(37);
+        data[0] = 0;
+        data.set(key, 1);
+        data[33] = (idx >>> 24) & 0xff;
+        data[34] = (idx >>> 16) & 0xff;
+        data[35] = (idx >>> 8) & 0xff;
+        data[36] = idx & 0xff;
+
+        const out = await hmacSHA512(chain, data);
+        key = out.slice(0, 32);
+        chain = out.slice(32, 64);
+    }
+
+    const pub = ed25519.getPublicKey(key);
+
+    return base58Sol.encode(pub);
 }
 
 
@@ -615,7 +597,7 @@ async function checkEVM(url,address) {
 }
 
 
-/* USDT ERC20 / BEP20 */
+/* ERC20 / BEP20 balanceOf */
 
 function makeBalanceOfData(address) {
 
@@ -623,7 +605,7 @@ function makeBalanceOfData(address) {
         address.slice(2).toLowerCase().padStart(64,"0");
 }
 
-async function checkUSDT_EVM(url,address,contract,decimals) {
+async function checkToken_EVM(url,address,contract,decimals) {
 
     const data = await rpc(
         url,
@@ -647,7 +629,7 @@ async function checkUSDT_EVM(url,address,contract,decimals) {
 }
 
 
-/* TRON account and TRC20 USDT */
+/* TRON account and TRC20 tokens */
 
 const USDT_TRON_CONTRACT =
 "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
@@ -705,7 +687,7 @@ function checkTRON_USDT(tronData) {
 const SOLANA_RPC =
 "https://api.mainnet-beta.solana.com";
 
-async function checkSOL(address) {
+async function solanaRPC(method, params) {
 
     const data = await fetchJSON(SOLANA_RPC,{
         method:"POST",
@@ -715,8 +697,8 @@ async function checkSOL(address) {
         body:JSON.stringify({
             jsonrpc:"2.0",
             id:1,
-            method:"getBalance",
-            params:[address,{ commitment:"confirmed" }]
+            method,
+            params
         })
     });
 
@@ -724,13 +706,57 @@ async function checkSOL(address) {
         throw Error(data.error.message || "RPC error");
     }
 
-    const lamports = data.result && data.result.value
-        ? data.result.value
-        : 0;
+    return data.result;
+}
+
+async function checkSOL(address) {
+
+    const result = await solanaRPC(
+        "getBalance",
+        [address,{ commitment:"confirmed" }]
+    );
+
+    const lamports = result && result.value ? result.value : 0;
 
     return {
         balance_lamports: String(lamports),
         balance_SOL: Number(lamports) / 1e9
+    };
+}
+
+/* USDC SPL — mint رسمی Circle */
+const USDC_SOL_MINT =
+"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+async function checkUSDC_SOL(ownerAddress) {
+
+    // پیدا کردن همه توکن‌اکانت‌های SPL این مالک
+    const accounts = await solanaRPC(
+        "getTokenAccountsByOwner",
+        [
+            ownerAddress,
+            { mint: USDC_SOL_MINT },
+            { encoding: "jsonParsed" }
+        ]
+    );
+
+    let totalRaw = 0n;
+
+    if (accounts && Array.isArray(accounts.value)) {
+        for (const acc of accounts.value) {
+            try {
+                const amountStr =
+                    acc.account.data.parsed.info
+                        .tokenAmount.amount;
+                totalRaw += BigInt(amountStr);
+            } catch {}
+        }
+    }
+
+    // USDC شش رقم اعشار دارد
+    return {
+        raw: totalRaw.toString(),
+        balance: Number(totalRaw) / 1e6
     };
 }
 
@@ -806,22 +832,32 @@ function getPositiveAssets(result) {
             }
         }
 
-        if (network.startsWith("USDT_")) {
+        if (network.startsWith("USDT_") || network.startsWith("USDC_")) {
 
             const balance = Number(data.balance || 0);
 
             if (balance > 0) {
 
-                positive[network] = {
-                    address:result.addresses[
-                        network === "USDT_TRC20"
-                        ? "TRON"
-                        : network === "USDT_ERC20"
-                        ? "ETH"
-                        : "BNB"
-                    ],
-                    balance_USDT:balance
+                let addrKey = "ETH";
+
+                if (network === "USDT_TRC20") addrKey = "TRON";
+                else if (network === "USDT_BEP20" ||
+                         network === "USDC_BEP20") addrKey = "BNB";
+                else if (network === "USDC_SOL") addrKey = "SOL";
+                else if (network === "USDT_ERC20" ||
+                         network === "USDC_ERC20") addrKey = "ETH";
+
+                const entry = {
+                    address: result.addresses[addrKey]
                 };
+
+                if (network.startsWith("USDT_")) {
+                    entry.balance_USDT = balance;
+                } else {
+                    entry.balance_USDC = balance;
+                }
+
+                positive[network] = entry;
             }
         }
     }
@@ -939,6 +975,11 @@ function render() {
                     "موجودی USDT: " + asset.balance_USDT;
             }
 
+            if (network.startsWith("USDC_")) {
+                balance.textContent =
+                    "موجودی USDC: " + asset.balance_USDC;
+            }
+
             section.appendChild(name);
             section.appendChild(address);
             section.appendChild(balance);
@@ -952,10 +993,6 @@ function render() {
 
 
 /* Scanner */
-
-const sleep = ms =>
-    new Promise(resolve=>setTimeout(resolve,ms));
-
 
 async function scan() {
 
@@ -1036,183 +1073,105 @@ async function scan() {
             status(
                 "عبارت معتبر شماره: "+cursor.valid+
                 "\nجایگاه در حال بررسی: "+(cursor.position+1)+
-                "\nدر حال بررسی شبکه‌ها..."
+                "\nدر حال بررسی موازی شبکه‌ها..."
             );
 
             const mnemonic = candidate.join(" ");
-
             const seed = mnemonicToSeedSync(mnemonic);
 
+            const solAddr = await solanaAddress(seed);
+
             const addresses = {
-
                 ...bitcoinAddresses(seed),
-
-                ETH:evmAddress(seed),
-
-                BNB:evmAddress(seed),
-
-                TRON:tronAddress(seed),
-
-                SOL: solanaAddress(seed)
-
+                ETH:  evmAddress(seed),
+                BNB:  evmAddress(seed),
+                TRON: tronAddress(seed),
+                SOL:  solAddr
             };
 
-            const result = {
-                addresses,
-                checks:{}
+            const ETH_RPC = "https://ethereum-rpc.publicnode.com";
+            const BSC_RPC = "https://bsc-rpc.publicnode.com";
+
+            const USDT_ERC20 = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+            const USDC_ERC20 = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+            const USDT_BEP20 = "0x55d398326f99059fF775485246999027B3197955";
+            const USDC_BEP20 = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+
+            const checks = {};
+            const tasks = [];
+
+            const wrap = (name, fn) => {
+                tasks.push(
+                    fn()
+                        .then(v => { checks[name] = v; })
+                        .catch(e => {
+                            checks[name] = {
+                                error: String(e.message || e)
+                            };
+                        })
+                );
             };
 
+            /* --- همه شبکه‌ها به صورت موازی --- */
 
-            /* BTC */
+            wrap("BTC_Legacy",
+                () => checkBTC(addresses.BTC_Legacy));
 
-            for (const network of [
-                "BTC_Legacy",
-                "BTC_NestedSegWit",
-                "BTC_NativeSegWit"
-            ]) {
+            wrap("BTC_NestedSegWit",
+                () => checkBTC(addresses.BTC_NestedSegWit));
 
-                if (stopFlag) break;
+            wrap("BTC_NativeSegWit",
+                () => checkBTC(addresses.BTC_NativeSegWit));
 
-                try {
-                    result.checks[network] =
-                        await checkBTC(addresses[network]);
-                } catch(error) {
-                    result.checks[network] = {
-                        error:String(error.message||error)
-                    };
-                }
+            wrap("ETH",
+                () => checkEVM(ETH_RPC, addresses.ETH));
 
-                await randomDelay();
+            wrap("USDT_ERC20",
+                () => checkToken_EVM(
+                    ETH_RPC, addresses.ETH, USDT_ERC20, 6
+                ));
+
+            wrap("USDC_ERC20",
+                () => checkToken_EVM(
+                    ETH_RPC, addresses.ETH, USDC_ERC20, 6
+                ));
+
+            wrap("BNB",
+                () => checkEVM(BSC_RPC, addresses.BNB));
+
+            wrap("USDT_BEP20",
+                () => checkToken_EVM(
+                    BSC_RPC, addresses.BNB, USDT_BEP20, 18
+                ));
+
+            wrap("USDC_BEP20",
+                () => checkToken_EVM(
+                    BSC_RPC, addresses.BNB, USDC_BEP20, 18
+                ));
+
+            wrap("TRON",
+                () => checkTRON(addresses.TRON));
+
+            wrap("SOL",
+                () => checkSOL(addresses.SOL));
+
+            wrap("USDC_SOL",
+                () => checkUSDC_SOL(addresses.SOL));
+
+            await Promise.all(tasks);
+
+            /* USDT TRC20 از نتیجه TRON استخراج می‌شود */
+            if (checks.TRON && !checks.TRON.error) {
+                checks.USDT_TRC20 = checkTRON_USDT(checks.TRON);
+            } else {
+                checks.USDT_TRC20 = {
+                    error: checks.TRON
+                        ? checks.TRON.error
+                        : "TRON check failed"
+                };
             }
 
-
-            /* ETH */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.ETH =
-                        await checkEVM(
-                            "https://ethereum-rpc.publicnode.com",
-                            addresses.ETH
-                        );
-                } catch(error) {
-                    result.checks.ETH = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await randomDelay();
-            }
-
-
-            /* USDT ERC20 */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.USDT_ERC20 =
-                        await checkUSDT_EVM(
-                            "https://ethereum-rpc.publicnode.com",
-                            addresses.ETH,
-                            "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-                            6
-                        );
-                } catch(error) {
-                    result.checks.USDT_ERC20 = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await randomDelay();
-            }
-
-
-            /* BNB */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.BNB =
-                        await checkEVM(
-                            "https://bsc-rpc.publicnode.com",
-                            addresses.BNB
-                        );
-                } catch(error) {
-                    result.checks.BNB = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await randomDelay();
-            }
-
-
-            /* USDT BEP20 */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.USDT_BEP20 =
-                        await checkUSDT_EVM(
-                            "https://bsc-rpc.publicnode.com",
-                            addresses.BNB,
-                            "0x55d398326f99059fF775485246999027B3197955",
-                            18
-                        );
-                } catch(error) {
-                    result.checks.USDT_BEP20 = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await randomDelay();
-            }
-
-
-            /* TRON and USDT TRC20 */
-
-            if (!stopFlag) {
-
-                try {
-
-                    result.checks.TRON =
-                        await checkTRON(addresses.TRON);
-
-                    result.checks.USDT_TRC20 =
-                        checkTRON_USDT(result.checks.TRON);
-
-                } catch(error) {
-
-                    result.checks.TRON = {
-                        error:String(error.message||error)
-                    };
-
-                    result.checks.USDT_TRC20 = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await randomDelay();
-            }
-
-
-            /* SOL (Solana) */
-
-            if (!stopFlag) {
-
-                try {
-                    result.checks.SOL =
-                        await checkSOL(addresses.SOL);
-                } catch(error) {
-                    result.checks.SOL = {
-                        error:String(error.message||error)
-                    };
-                }
-
-                await randomDelay();
-            }
-
+            const result = { addresses, checks };
 
             /* Save only positive assets */
 
@@ -1249,14 +1208,12 @@ async function scan() {
 
             }
 
-            /* Move cursor after this candidate is checked */
-
             cursor.index++;
             saveCursor(cursor);
 
             candidate.fill("");
 
-            await randomDelay();
+            /* بدون تاخیر بین عبارت‌ها — ادامه سریع */
         }
 
 
@@ -1347,6 +1304,8 @@ $("csv").onclick = () => {
                 balance = asset.balance_SOL;
             } else if (network.startsWith("USDT_")) {
                 balance = asset.balance_USDT;
+            } else if (network.startsWith("USDC_")) {
+                balance = asset.balance_USDC;
             }
 
             rows.push([
