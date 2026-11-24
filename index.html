@@ -19,12 +19,8 @@ main {
     padding: 18px;
     border-radius: 14px;
 }
-h2 {
-    color: #1556b8;
-}
-textarea,
-input,
-button {
+h2 { color: #1556b8; }
+textarea, input, button {
     width: 100%;
     box-sizing: border-box;
     padding: 12px;
@@ -32,10 +28,7 @@ button {
     border-radius: 8px;
     font-size: 15px;
 }
-textarea,
-input {
-    border: 1px solid #ccd3df;
-}
+textarea, input { border: 1px solid #ccd3df; }
 button {
     border: 0;
     background: #1556b8;
@@ -43,22 +36,11 @@ button {
     font-weight: bold;
     cursor: pointer;
 }
-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-.stop {
-    background: #a52a2a;
-}
-.clear {
-    background: #555;
-}
-.report {
-    background: #16834a;
-}
-.report2 {
-    background: #7a4a00;
-}
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+.stop { background: #a52a2a; }
+.clear { background: #555; }
+.report { background: #16834a; }
+.report2 { background: #7a4a00; }
 .warning {
     background: #fff1d0;
     color: #674800;
@@ -110,9 +92,7 @@ button:disabled {
     padding-bottom: 8px;
     border-bottom: 2px solid #e3e8f0;
 }
-.section-head h3 {
-    margin: 0;
-}
+.section-head h3 { margin: 0; }
 .counter {
     font-size: 13px;
     color: #334;
@@ -121,14 +101,8 @@ button:disabled {
     border-radius: 6px;
     white-space: nowrap;
 }
-.counter.green {
-    background: #d8f3e2;
-    color: #0d5c2f;
-}
-.counter.red {
-    background: #fbe0e0;
-    color: #7a1f1f;
-}
+.counter.green { background: #d8f3e2; color: #0d5c2f; }
+.counter.red { background: #fbe0e0; color: #7a1f1f; }
 .empty-note {
     color: #8a94a6;
     font-size: 14px;
@@ -152,7 +126,7 @@ button:disabled {
 
 <h2>Wallet Recovery Scanner</h2>
 
-<p>بررسی عبارت‌های معتبر و نمایش جداگانه دارایی‌ها و موارد بدون موجودی.</p>
+<p>بررسی ترتیبی شبکه‌ها با تأخیر قابل تنظیم.</p>
 
 <div class="warning">
 <strong>هشدار امنیتی:</strong>
@@ -171,16 +145,17 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <h3>۳. تاخیر بین عبارت‌ها (میلی‌ثانیه، ۵۰۰ تا ۵۰۰۰)</h3>
 <input id="delay" type="number" value="500" min="500" max="5000">
 
-<h3>۴. کلید API ترون‌گرید (اختیاری، برای جلوگیری از محدودیت نرخ)</h3>
+<h3>۴. تاخیر بین شبکه‌ها (میلی‌ثانیه، ۱۰۰ تا ۲۵۰۰)</h3>
+<input id="networkDelay" type="number" value="300" min="100" max="2500">
+
+<h3>۵. کلید API ترون‌گرید (اختیاری)</h3>
 <input id="tronApiKey" type="text"
 placeholder="TRON-PRO-API-KEY (اختیاری)">
 
 <div class="hint">
-نکته مهم درباره TRON: آدرس TRON برای «فعال شدن» نیاز به دریافت حداقل ۰.۱ TRX دارد.
-اگر موجودی شما کمتر از این مقدار باشد (مثل 0.0011 TRX)، ممکن است API ترون‌گرید
-اطلاعات آن را برنگرداند. در این حالت، با وارد کردن کلید API یا صبر چند ساعت،
-احتمال بازیابی بیشتر می‌شود. همچنین اگر آدرس را می‌دانید، می‌توانید
-مستقیماً در Tronscan جستجو کنید.
+بررسی حالا ترتیبی است: هر شبکه یکی‌یکی با تأخیر مشخص چک می‌شود.
+این کار جلوی خطای 429 (محدودیت نرخ) را می‌گیرد و باعث می‌شود TRX
+و بقیه دارایی‌ها دقیق‌تر پیدا شوند.
 </div>
 
 <button id="start">شروع / ادامه اسکن</button>
@@ -211,13 +186,10 @@ placeholder="TRON-PRO-API-KEY (اختیاری)">
 </div>
 
 <p class="small">
-این نسخه اولین آدرس استاندارد هر شبکه را بررسی می‌کند:
-BTC (Legacy / Nested SegWit / Native SegWit)،
-ETH، BNB، TRX،
+BTC (Legacy / Nested SegWit / Native SegWit)، ETH، BNB، TRX،
 USDT (ERC20 / BEP20 / TRC20)،
 USDC (ERC20 / BEP20 / Polygon / Arbitrum / Optimism / Base / Avalanche).
-هر عبارت معتبر (چه دارای موجودی، چه بدون موجودی) در تاریخچه ثبت می‌شود.
-تاخیر بین عبارت‌ها در بازه ۵۰۰ تا ۵۰۰۰ میلی‌ثانیه خودکار تنظیم می‌شود.
+همه شبکه‌ها یکی‌یکی و با تأخیر بررسی می‌شوند.
 </p>
 
 </main>
@@ -264,6 +236,8 @@ const LIMIT_MIN = 10;
 const LIMIT_MAX = 500;
 const DELAY_MIN = 500;
 const DELAY_MAX = 5000;
+const NET_DELAY_MIN = 100;
+const NET_DELAY_MAX = 2500;
 
 const BECH32_CHARSET =
     "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
@@ -278,49 +252,42 @@ const USDT_BEP20_CONTRACT =
     "0x55d398326f99059fF775485246999027B3197955";
 
 const USDC_NETWORKS = {
-
     USDC_ERC20: {
         rpc: "https://ethereum-rpc.publicnode.com",
         contract: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         decimals: 6,
         addressKey: "ETH"
     },
-
     USDC_BEP20: {
         rpc: "https://bsc-rpc.publicnode.com",
         contract: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
         decimals: 18,
         addressKey: "BNB"
     },
-
     USDC_Polygon: {
         rpc: "https://polygon-bor-rpc.publicnode.com",
         contract: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
         decimals: 6,
         addressKey: "ETH"
     },
-
     USDC_Arbitrum: {
         rpc: "https://arbitrum-one-rpc.publicnode.com",
         contract: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
         decimals: 6,
         addressKey: "ETH"
     },
-
     USDC_Optimism: {
         rpc: "https://optimism-rpc.publicnode.com",
         contract: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
         decimals: 6,
         addressKey: "ETH"
     },
-
     USDC_Base: {
         rpc: "https://base-rpc.publicnode.com",
         contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         decimals: 6,
         addressKey: "ETH"
     },
-
     USDC_Avalanche: {
         rpc: "https://avalanche-c-chain-rpc.publicnode.com",
         contract: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
@@ -359,7 +326,7 @@ function status(text) {
 }
 
 function concat(...arrays) {
-    let length = arrays.reduce((n,a)=>n+a.length, 0);
+    let length = arrays.reduce((n, a) => n + a.length, 0);
     let output = new Uint8Array(length);
     let offset = 0;
     for (const array of arrays) {
@@ -386,45 +353,30 @@ const BASE58_ALPHABET =
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 function base58(data) {
-
     let zeros = 0;
-
     while (zeros < data.length && data[zeros] === 0) {
         zeros++;
     }
-
     let number = 0n;
-
     for (const byte of data) {
         number = number * 256n + BigInt(byte);
     }
-
     let output = "";
-
     while (number > 0n) {
         let remainder = Number(number % 58n);
         output = BASE58_ALPHABET[remainder] + output;
         number /= 58n;
     }
-
     return "1".repeat(zeros) + output;
 }
 
 function checksum(data) {
-    return concat(
-        data,
-        sha256(sha256(data)).slice(0, 4)
-    );
+    return concat(data, sha256(sha256(data)).slice(0, 4));
 }
 
 function base58check(version, payload) {
     return base58(
-        checksum(
-            concat(
-                new Uint8Array([version]),
-                payload
-            )
-        )
+        checksum(concat(new Uint8Array([version]), payload))
     );
 }
 
@@ -432,75 +384,50 @@ function base58check(version, payload) {
 /* ==================== Bech32 ==================== */
 
 function polymod(values) {
-
     let c = 1;
-
     for (const value of values) {
-
         let top = c >>> 25;
-
         c = ((c & 0x1ffffff) << 5) ^ value;
-
         const generators = [
-            0x3b6a57b2,
-            0x26508e6d,
-            0x1ea119fa,
-            0x3d4233dd,
-            0x2a1462b3
+            0x3b6a57b2, 0x26508e6d, 0x1ea119fa,
+            0x3d4233dd, 0x2a1462b3
         ];
-
         for (let i = 0; i < 5; i++) {
-            if ((top >>> i) & 1) {
-                c ^= generators[i];
-            }
+            if ((top >>> i) & 1) c ^= generators[i];
         }
     }
-
     return c >>> 0;
 }
 
 function hrpExpand(hrp) {
-
-    let high = [];
-    let low = [];
-
+    let high = [], low = [];
     for (const char of hrp) {
         let value = char.charCodeAt(0);
         high.push(value >> 5);
         low.push(value & 31);
     }
-
     return [...high, 0, ...low];
 }
 
 function convertBits(data, from, to, pad) {
-
     let accumulator = 0;
     let bits = 0;
     let output = [];
-
     const maxValue = (1 << to) - 1;
-
     for (const value of data) {
-
         if (value < 0 || (value >> from)) {
             throw Error("Invalid bit conversion");
         }
-
         accumulator = (accumulator << from) | value;
         bits += from;
-
         while (bits >= to) {
             bits -= to;
             output.push((accumulator >> bits) & maxValue);
         }
     }
-
     if (pad) {
         if (bits) {
-            output.push(
-                (accumulator << (to - bits)) & maxValue
-            );
+            output.push((accumulator << (to - bits)) & maxValue);
         }
     } else if (
         bits >= from ||
@@ -508,121 +435,65 @@ function convertBits(data, from, to, pad) {
     ) {
         throw Error("Invalid padding");
     }
-
     return output;
 }
 
 function bech32(hrp, version, program) {
-
-    const data = [
-        version,
-        ...convertBits(program, 8, 5, true)
-    ];
-
-    const values = [
-        ...hrpExpand(hrp),
-        ...data,
-        0, 0, 0, 0, 0, 0
-    ];
-
+    const data = [version, ...convertBits(program, 8, 5, true)];
+    const values = [...hrpExpand(hrp), ...data, 0, 0, 0, 0, 0, 0];
     const mod = polymod(values) ^ 1;
-
     let cs = [];
-
     for (let i = 0; i < 6; i++) {
         cs.push((mod >>> (5 * (5 - i))) & 31);
     }
-
     return hrp + "1" +
-        [...data, ...cs]
-        .map(x => BECH32_CHARSET[x])
-        .join("");
+        [...data, ...cs].map(x => BECH32_CHARSET[x]).join("");
 }
 
 
 /* ==================== Derivation ==================== */
 
 function getPublicKey(seed, path, compressed = true) {
-
     const root = HDKey.fromMasterSeed(seed);
     const node = root.derive(path);
-
     if (!node.privateKey) {
         throw Error("مسیر نامعتبر: " + path);
     }
-
-    return secp256k1.getPublicKey(
-        node.privateKey,
-        compressed
-    );
+    return secp256k1.getPublicKey(node.privateKey, compressed);
 }
 
 function bitcoinAddresses(seed) {
-
-    const legacyPub = getPublicKey(
-        seed,
-        "m/44'/0'/0'/0/0"
-    );
-
-    const nestedPub = getPublicKey(
-        seed,
-        "m/49'/0'/0'/0/0"
-    );
-
-    const nativePub = getPublicKey(
-        seed,
-        "m/84'/0'/0'/0/0"
-    );
-
+    const legacyPub = getPublicKey(seed, "m/44'/0'/0'/0/0");
+    const nestedPub = getPublicKey(seed, "m/49'/0'/0'/0/0");
+    const nativePub = getPublicKey(seed, "m/84'/0'/0'/0/0");
     return {
-
         BTC_Legacy:
-        base58check(0, hash160(legacyPub)),
-
+            base58check(0, hash160(legacyPub)),
         BTC_NestedSegWit:
-        base58check(
-            5,
-            hash160(
-                concat(
-                    new Uint8Array([0, 20]),
-                    hash160(nestedPub)
+            base58check(
+                5,
+                hash160(
+                    concat(
+                        new Uint8Array([0, 20]),
+                        hash160(nestedPub)
+                    )
                 )
-            )
-        ),
-
+            ),
         BTC_NativeSegWit:
-        bech32("bc", 0, hash160(nativePub))
+            bech32("bc", 0, hash160(nativePub))
     };
 }
 
 function evmAddress(seed) {
-
-    const publicKey = getPublicKey(
-        seed,
-        "m/44'/60'/0'/0/0",
-        false
-    );
-
+    const publicKey = getPublicKey(seed, "m/44'/60'/0'/0/0", false);
     const hash = keccak_256(publicKey.slice(1));
-
     return "0x" + hex(hash.slice(-20));
 }
 
 function tronAddress(seed) {
-
-    const publicKey = getPublicKey(
-        seed,
-        "m/44'/195'/0'/0/0",
-        false
-    );
-
+    const publicKey = getPublicKey(seed, "m/44'/195'/0'/0/0", false);
     const hash = keccak_256(publicKey.slice(1));
-
-    const payload = concat(
-        new Uint8Array([0x41]),
-        hash.slice(-20)
-    );
-
+    const payload = concat(new Uint8Array([0x41]), hash.slice(-20));
     return base58(checksum(payload));
 }
 
@@ -630,29 +501,19 @@ function tronAddress(seed) {
 /* ==================== HTTP ==================== */
 
 async function fetchJSON(url, options = {}) {
-
     const controller = new AbortController();
-
-    const timeout = setTimeout(
-        () => controller.abort(),
-        20000
-    );
-
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
-
         const response = await fetch(url, {
             ...options,
             signal: controller.signal
         });
-
         if (!response.ok) {
             const err = Error("HTTP " + response.status);
             err.status = response.status;
             throw err;
         }
-
         return await response.json();
-
     } finally {
         clearTimeout(timeout);
     }
@@ -662,20 +523,16 @@ async function fetchJSON(url, options = {}) {
 /* ==================== BTC ==================== */
 
 async function checkBTC(address) {
-
     const data = await fetchJSON(
         "https://blockstream.info/api/address/" +
         encodeURIComponent(address)
     );
-
     const confirmed =
         data.chain_stats.funded_txo_sum -
         data.chain_stats.spent_txo_sum;
-
     const unconfirmed =
         data.mempool_stats.funded_txo_sum -
         data.mempool_stats.spent_txo_sum;
-
     return {
         balance_satoshis: confirmed + unconfirmed,
         balance_BTC: (confirmed + unconfirmed) / 100000000,
@@ -689,14 +546,10 @@ async function checkBTC(address) {
 /* ==================== EVM RPC ==================== */
 
 async function rpc(url, method, params) {
-
     const id = ++RPC_ID;
-
     const data = await fetchJSON(url, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             jsonrpc: "2.0",
             id,
@@ -704,25 +557,17 @@ async function rpc(url, method, params) {
             params
         })
     });
-
     if (data.error) {
         throw Error(data.error.message || "RPC error");
     }
-
     return data.result;
 }
 
 async function checkEVM(url, address) {
-
     const balance = await rpc(
-        url,
-        "eth_getBalance",
-        [address, "latest"]
+        url, "eth_getBalance", [address, "latest"]
     );
-
-    return {
-        balance_wei: BigInt(balance).toString()
-    };
+    return { balance_wei: BigInt(balance).toString() };
 }
 
 function makeBalanceOfData(address) {
@@ -730,24 +575,12 @@ function makeBalanceOfData(address) {
         address.slice(2).toLowerCase().padStart(64, "0");
 }
 
-async function checkTokenBalance(
-    url, address, contract, decimals
-) {
-
-    const data = await rpc(
-        url,
-        "eth_call",
-        [
-            {
-                to: contract,
-                data: makeBalanceOfData(address)
-            },
-            "latest"
-        ]
-    );
-
+async function checkTokenBalance(url, address, contract, decimals) {
+    const data = await rpc(url, "eth_call", [
+        { to: contract, data: makeBalanceOfData(address) },
+        "latest"
+    ]);
     const raw = BigInt(data || "0x0");
-
     return {
         raw: raw.toString(),
         balance: Number(raw) / Math.pow(10, decimals),
@@ -756,80 +589,35 @@ async function checkTokenBalance(
 }
 
 
-/* ==================== USDC ==================== */
-
-async function checkUSDCNETWORKS(addresses) {
-
-    const checks = {};
-
-    const jobs = Object.entries(USDC_NETWORKS).map(
-        ([name, cfg]) =>
-            checkTokenBalance(
-                cfg.rpc,
-                addresses[cfg.addressKey],
-                cfg.contract,
-                cfg.decimals
-            )
-            .then(data => {
-                checks[name] = data;
-            })
-            .catch(error => {
-                checks[name] = {
-                    error: String(error.message || error)
-                };
-            })
-    );
-
-    await Promise.allSettled(jobs);
-
-    return checks;
-}
-
-
 /* ==================== TRON ==================== */
 
 async function fetchTronAccount(address, retries = 4) {
-
     const apiKey = $("tronApiKey").value.trim();
-
     const headers = { "accept": "application/json" };
-
     if (apiKey) {
         headers["TRON-PRO-API-KEY"] = apiKey;
     }
-
     for (let attempt = 0; attempt < retries; attempt++) {
-
         try {
-
             return await fetchJSON(
                 "https://api.trongrid.io/v1/accounts/" +
                 encodeURIComponent(address),
                 { headers }
             );
-
         } catch (e) {
-
             if (e.status === 429 || e.status === 403) {
-                const wait = Math.min(
-                    5000,
-                    2000 * (attempt + 1)
-                );
+                const wait = Math.min(5000, 2000 * (attempt + 1));
                 await new Promise(r => setTimeout(r, wait));
                 continue;
             }
-
             throw e;
         }
     }
-
     throw Error("TronGrid rate limit: تلاش مجدد ناموفق");
 }
 
 async function checkTRON(address) {
-
     const account = await fetchTronAccount(address);
-
     if (!account || !account.data || account.data.length === 0) {
         return {
             activated: false,
@@ -838,9 +626,7 @@ async function checkTRON(address) {
             tokens: []
         };
     }
-
     const data = account.data[0];
-
     return {
         activated: true,
         balance_sun: data.balance || 0,
@@ -850,11 +636,8 @@ async function checkTRON(address) {
 }
 
 function checkTRONUSDT(tronData) {
-
     for (const token of (tronData.tokens || [])) {
-
         const balance = token[USDT_TRON_CONTRACT];
-
         if (balance !== undefined) {
             const raw = BigInt(balance);
             return {
@@ -863,25 +646,17 @@ function checkTRONUSDT(tronData) {
             };
         }
     }
-
-    return {
-        raw: "0",
-        balance: 0
-    };
+    return { raw: "0", balance: 0 };
 }
 
 
 /* ==================== Positive Assets ==================== */
 
 function getPositiveAssets(result) {
-
     const positive = {};
-
     for (const [network, data] of Object.entries(result.checks)) {
-
         if (!data || data.error) continue;
 
-        /* BTC */
         if (network.startsWith("BTC_")) {
             if (Number(data.balance_satoshis || 0) > 0) {
                 positive[network] = {
@@ -890,19 +665,14 @@ function getPositiveAssets(result) {
                 };
             }
         }
-
-        /* ETH / BNB */
         if (network === "ETH" || network === "BNB") {
             if (BigInt(data.balance_wei || "0") > 0n) {
                 positive[network] = {
                     address: result.addresses[network],
-                    balance_native:
-                        Number(data.balance_wei) / 1e18
+                    balance_native: Number(data.balance_wei) / 1e18
                 };
             }
         }
-
-        /* TRON */
         if (network === "TRON") {
             if (Number(data.balance_sun || 0) > 0) {
                 positive[network] = {
@@ -911,8 +681,6 @@ function getPositiveAssets(result) {
                 };
             }
         }
-
-        /* USDT */
         if (network.startsWith("USDT_")) {
             if (Number(data.balance || 0) > 0) {
                 positive[network] = {
@@ -923,8 +691,6 @@ function getPositiveAssets(result) {
                 };
             }
         }
-
-        /* USDC */
         if (network.startsWith("USDC_")) {
             if (Number(data.balance || 0) > 0) {
                 positive[network] = {
@@ -936,7 +702,6 @@ function getPositiveAssets(result) {
             }
         }
     }
-
     return positive;
 }
 
@@ -944,7 +709,6 @@ function getPositiveAssets(result) {
 /* ==================== Cursor / Storage ==================== */
 
 function getCursor() {
-
     try {
         return JSON.parse(
             localStorage.getItem("wrs_cursor") ||
@@ -956,39 +720,25 @@ function getCursor() {
 }
 
 function saveCursor(cursor) {
-    localStorage.setItem(
-        "wrs_cursor",
-        JSON.stringify(cursor)
-    );
+    localStorage.setItem("wrs_cursor", JSON.stringify(cursor));
 }
 
 function saveHistory() {
-    localStorage.setItem(
-        "wrs_history",
-        JSON.stringify(history)
-    );
+    localStorage.setItem("wrs_history", JSON.stringify(history));
 }
 
 
 /* ==================== Render ==================== */
 
 function renderFound() {
-
-    const list = history
-        .filter(h => h.has_assets)
-        .slice()
-        .reverse();
-
+    const list = history.filter(h => h.has_assets).slice().reverse();
     $("counterFound").textContent = list.length + " مورد";
-
-    $("foundEmpty").style.display =
-        list.length ? "none" : "block";
+    $("foundEmpty").style.display = list.length ? "none" : "block";
 
     const container = $("foundList");
     container.innerHTML = "";
 
     for (const item of list) {
-
         const box = document.createElement("div");
         box.className = "result found";
 
@@ -996,16 +746,13 @@ function renderFound() {
         title.textContent = "✅ دارایی پیدا شد";
 
         const word = document.createElement("p");
-        word.textContent =
-            "کلمه گمشده: " + item.missing_word;
+        word.textContent = "کلمه گمشده: " + item.missing_word;
 
         const position = document.createElement("p");
-        position.textContent =
-            "جایگاه کلمه: " + item.missing_position;
+        position.textContent = "جایگاه کلمه: " + item.missing_position;
 
         const time = document.createElement("p");
-        time.textContent =
-            "زمان بررسی: " + (item.checked_at || "-");
+        time.textContent = "زمان بررسی: " + (item.checked_at || "-");
 
         box.appendChild(title);
         box.appendChild(word);
@@ -1013,7 +760,6 @@ function renderFound() {
         box.appendChild(time);
 
         for (const [network, asset] of Object.entries(item.assets)) {
-
             const section = document.createElement("div");
             section.style.borderTop = "1px solid #ddd";
             section.style.paddingTop = "8px";
@@ -1022,35 +768,27 @@ function renderFound() {
             name.textContent = network;
 
             const address = document.createElement("p");
-            address.textContent =
-                "آدرس: " + asset.address;
+            address.textContent = "آدرس: " + asset.address;
 
             const balance = document.createElement("p");
 
             if (network.startsWith("BTC_")) {
-                balance.textContent =
-                    "موجودی BTC: " + asset.balance_BTC;
+                balance.textContent = "موجودی BTC: " + asset.balance_BTC;
             } else if (network === "ETH") {
-                balance.textContent =
-                    "موجودی ETH: " + asset.balance_native;
+                balance.textContent = "موجودی ETH: " + asset.balance_native;
             } else if (network === "BNB") {
-                balance.textContent =
-                    "موجودی BNB: " + asset.balance_native;
+                balance.textContent = "موجودی BNB: " + asset.balance_native;
             } else if (network === "TRON") {
-                balance.textContent =
-                    "موجودی TRX: " + asset.balance_TRX;
+                balance.textContent = "موجودی TRX: " + asset.balance_TRX;
             } else if (network.startsWith("USDT_")) {
-                balance.textContent =
-                    "موجودی USDT: " + asset.balance_USDT;
+                balance.textContent = "موجودی USDT: " + asset.balance_USDT;
             } else if (network.startsWith("USDC_")) {
-                balance.textContent =
-                    "موجودی USDC: " + asset.balance_USDC;
+                balance.textContent = "موجودی USDC: " + asset.balance_USDC;
             }
 
             section.appendChild(name);
             section.appendChild(address);
             section.appendChild(balance);
-
             box.appendChild(section);
         }
 
@@ -1059,22 +797,14 @@ function renderFound() {
 }
 
 function renderEmpty() {
-
-    const list = history
-        .filter(h => !h.has_assets)
-        .slice()
-        .reverse();
-
+    const list = history.filter(h => !h.has_assets).slice().reverse();
     $("counterEmpty").textContent = list.length + " مورد";
-
-    $("emptyListEmpty").style.display =
-        list.length ? "none" : "block";
+    $("emptyListEmpty").style.display = list.length ? "none" : "block";
 
     const container = $("emptyList");
     container.innerHTML = "";
 
     for (const item of list) {
-
         const box = document.createElement("div");
         box.className = "result empty";
 
@@ -1082,16 +812,13 @@ function renderEmpty() {
         title.textContent = "— بدون دارایی";
 
         const word = document.createElement("p");
-        word.textContent =
-            "کلمه گمشده: " + item.missing_word;
+        word.textContent = "کلمه گمشده: " + item.missing_word;
 
         const position = document.createElement("p");
-        position.textContent =
-            "جایگاه کلمه: " + item.missing_position;
+        position.textContent = "جایگاه کلمه: " + item.missing_position;
 
         const time = document.createElement("p");
-        time.textContent =
-            "زمان بررسی: " + (item.checked_at || "-");
+        time.textContent = "زمان بررسی: " + (item.checked_at || "-");
 
         box.appendChild(title);
         box.appendChild(word);
@@ -1110,17 +837,12 @@ function render() {
 
 /* ==================== Helpers ==================== */
 
-const sleep = ms =>
-    new Promise(resolve => setTimeout(resolve, ms));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function hasRateLimitError(result) {
-
     for (const data of Object.values(result.checks)) {
-
         if (!data || !data.error) continue;
-
         const msg = String(data.error);
-
         if (
             msg.includes("429") ||
             msg.toLowerCase().includes("rate") ||
@@ -1129,27 +851,149 @@ function hasRateLimitError(result) {
             return true;
         }
     }
-
     return false;
 }
 
 function readConfig() {
-
     let limit = Number($("limit").value);
     if (!Number.isFinite(limit)) limit = LIMIT_MIN;
-    limit = Math.max(
-        LIMIT_MIN,
-        Math.min(LIMIT_MAX, Math.floor(limit))
-    );
+    limit = Math.max(LIMIT_MIN, Math.min(LIMIT_MAX, Math.floor(limit)));
 
     let delay = Number($("delay").value);
     if (!Number.isFinite(delay)) delay = DELAY_MIN;
-    delay = Math.max(
-        DELAY_MIN,
-        Math.min(DELAY_MAX, Math.floor(delay))
+    delay = Math.max(DELAY_MIN, Math.min(DELAY_MAX, Math.floor(delay)));
+
+    let networkDelay = Number($("networkDelay").value);
+    if (!Number.isFinite(networkDelay)) networkDelay = NET_DELAY_MIN;
+    networkDelay = Math.max(
+        NET_DELAY_MIN,
+        Math.min(NET_DELAY_MAX, Math.floor(networkDelay))
     );
 
-    return { limit, delay };
+    return { limit, delay, networkDelay };
+}
+
+
+/* ==================== Sequential Network Check ==================== */
+
+/*
+  هر شبکه به‌صورت ترتیبی بررسی می‌شود.
+  بین هر شبکه، به اندازه networkDelay صبر می‌شود.
+  درخواست‌های داخل یک شبکه (مثل USDC که ۷ شبکه است)
+  هم یکی‌یکی انجام می‌شوند.
+*/
+
+async function runNetworkCheck(result, networkDelay) {
+
+    /* 1) BTC Legacy */
+    try {
+        result.checks.BTC_Legacy =
+            await checkBTC(result.addresses.BTC_Legacy);
+    } catch (e) {
+        result.checks.BTC_Legacy = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 2) BTC Nested SegWit */
+    try {
+        result.checks.BTC_NestedSegWit =
+            await checkBTC(result.addresses.BTC_NestedSegWit);
+    } catch (e) {
+        result.checks.BTC_NestedSegWit = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 3) BTC Native SegWit */
+    try {
+        result.checks.BTC_NativeSegWit =
+            await checkBTC(result.addresses.BTC_NativeSegWit);
+    } catch (e) {
+        result.checks.BTC_NativeSegWit = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 4) ETH */
+    try {
+        result.checks.ETH = await checkEVM(
+            "https://ethereum-rpc.publicnode.com",
+            result.addresses.ETH
+        );
+    } catch (e) {
+        result.checks.ETH = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 5) USDT ERC20 */
+    try {
+        result.checks.USDT_ERC20 = await checkTokenBalance(
+            "https://ethereum-rpc.publicnode.com",
+            result.addresses.ETH,
+            USDT_ERC20_CONTRACT,
+            6
+        );
+    } catch (e) {
+        result.checks.USDT_ERC20 = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 6) BNB */
+    try {
+        result.checks.BNB = await checkEVM(
+            "https://bsc-rpc.publicnode.com",
+            result.addresses.BNB
+        );
+    } catch (e) {
+        result.checks.BNB = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 7) USDT BEP20 */
+    try {
+        result.checks.USDT_BEP20 = await checkTokenBalance(
+            "https://bsc-rpc.publicnode.com",
+            result.addresses.BNB,
+            USDT_BEP20_CONTRACT,
+            18
+        );
+    } catch (e) {
+        result.checks.USDT_BEP20 = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 8) TRON (اول TRX) */
+    try {
+        const tronData = await checkTRON(result.addresses.TRON);
+        result.checks.TRON = tronData;
+        result.checks.USDT_TRC20 = checkTRONUSDT(tronData);
+    } catch (e) {
+        result.checks.TRON = { error: String(e.message || e) };
+        result.checks.USDT_TRC20 = { error: String(e.message || e) };
+    }
+    await sleep(networkDelay);
+    if (stopFlag) return;
+
+    /* 9) USDC — یکی‌یکی */
+    for (const [name, cfg] of Object.entries(USDC_NETWORKS)) {
+        try {
+            result.checks[name] = await checkTokenBalance(
+                cfg.rpc,
+                result.addresses[cfg.addressKey],
+                cfg.contract,
+                cfg.decimals
+            );
+        } catch (e) {
+            result.checks[name] = { error: String(e.message || e) };
+        }
+        await sleep(networkDelay);
+        if (stopFlag) return;
+    }
 }
 
 
@@ -1158,7 +1002,6 @@ function readConfig() {
 async function scan() {
 
     if (running) return;
-
     running = true;
     stopFlag = false;
 
@@ -1182,8 +1025,7 @@ async function scan() {
     }
 
     let cursor = getCursor();
-
-    const { limit, delay: baseDelay } = readConfig();
+    const { limit, delay: baseDelay, networkDelay } = readConfig();
 
     let currentDelay = baseDelay;
     let successStreak = 0;
@@ -1192,17 +1034,17 @@ async function scan() {
     status(
         "اسکن شروع شد.\n" +
         "سقف این نوبت: " + limit + " عبارت معتبر\n" +
-        "تأخیر شروع: " + baseDelay + " ms"
+        "تأخیر بین عبارت‌ها: " + baseDelay + " ms\n" +
+        "تأخیر بین شبکه‌ها: " + networkDelay + " ms\n" +
+        "حالت: ترتیبی (نه موازی)"
     );
 
     try {
-
         while (
             cursor.position < 12 &&
             checked < limit &&
             !stopFlag
         ) {
-
             if (cursor.index >= 2048) {
                 cursor.position++;
                 cursor.index = 0;
@@ -1211,7 +1053,6 @@ async function scan() {
             }
 
             const candidate = words.slice();
-
             candidate.splice(
                 cursor.position,
                 0,
@@ -1231,7 +1072,7 @@ async function scan() {
                 "عبارت معتبر شماره: " + cursor.valid +
                 "\nدر این نوبت: " + checked + " / " + limit +
                 "\nجایگاه: " + (cursor.position + 1) +
-                "\nتأخیر: " + currentDelay + " ms"
+                "\nشبکه‌ها به‌ترتیب بررسی می‌شوند..."
             );
 
             const mnemonic = candidate.join(" ");
@@ -1245,132 +1086,20 @@ async function scan() {
             };
 
             const result = { addresses, checks: {} };
-            const jobs = [];
 
-            /* BTC */
-            for (const net of [
-                "BTC_Legacy",
-                "BTC_NestedSegWit",
-                "BTC_NativeSegWit"
-            ]) {
-                jobs.push(
-                    checkBTC(addresses[net])
-                        .then(d => { result.checks[net] = d; })
-                        .catch(e => {
-                            result.checks[net] = {
-                                error: String(e.message || e)
-                            };
-                        })
-                );
-            }
+            await runNetworkCheck(result, networkDelay);
 
-            /* ETH */
-            jobs.push(
-                checkEVM(
-                    "https://ethereum-rpc.publicnode.com",
-                    addresses.ETH
-                )
-                .then(d => { result.checks.ETH = d; })
-                .catch(e => {
-                    result.checks.ETH = {
-                        error: String(e.message || e)
-                    };
-                })
-            );
-
-            /* USDT ERC20 */
-            jobs.push(
-                checkTokenBalance(
-                    "https://ethereum-rpc.publicnode.com",
-                    addresses.ETH,
-                    USDT_ERC20_CONTRACT,
-                    6
-                )
-                .then(d => { result.checks.USDT_ERC20 = d; })
-                .catch(e => {
-                    result.checks.USDT_ERC20 = {
-                        error: String(e.message || e)
-                    };
-                })
-            );
-
-            /* BNB */
-            jobs.push(
-                checkEVM(
-                    "https://bsc-rpc.publicnode.com",
-                    addresses.BNB
-                )
-                .then(d => { result.checks.BNB = d; })
-                .catch(e => {
-                    result.checks.BNB = {
-                        error: String(e.message || e)
-                    };
-                })
-            );
-
-            /* USDT BEP20 */
-            jobs.push(
-                checkTokenBalance(
-                    "https://bsc-rpc.publicnode.com",
-                    addresses.BNB,
-                    USDT_BEP20_CONTRACT,
-                    18
-                )
-                .then(d => { result.checks.USDT_BEP20 = d; })
-                .catch(e => {
-                    result.checks.USDT_BEP20 = {
-                        error: String(e.message || e)
-                    };
-                })
-            );
-
-            /* USDC */
-            jobs.push(
-                checkUSDCNETWORKS(addresses)
-                    .then(usdc => {
-                        for (const [n, d] of Object.entries(usdc)) {
-                            result.checks[n] = d;
-                        }
-                    })
-            );
-
-            /* TRON */
-            jobs.push(
-                checkTRON(addresses.TRON)
-                    .then(d => {
-                        result.checks.TRON = d;
-                        result.checks.USDT_TRC20 =
-                            checkTRONUSDT(d);
-                    })
-                    .catch(e => {
-                        result.checks.TRON = {
-                            error: String(e.message || e)
-                        };
-                        result.checks.USDT_TRC20 = {
-                            error: String(e.message || e)
-                        };
-                    })
-            );
-
-            await Promise.allSettled(jobs);
-
-            /* تنظیم خودکار تأخیر */
+            /* تنظیم خودکار تأخیر بین عبارت‌ها */
             if (hasRateLimitError(result)) {
                 successStreak = 0;
                 currentDelay = Math.min(
                     DELAY_MAX,
-                    Math.max(
-                        DELAY_MIN,
-                        Math.floor(currentDelay * 2)
-                    )
+                    Math.max(DELAY_MIN, Math.floor(currentDelay * 2))
                 );
                 $("delay").value = currentDelay;
             } else {
                 successStreak++;
-                if (
-                    successStreak >= 3 &&
-                    currentDelay > baseDelay
-                ) {
+                if (successStreak >= 3 && currentDelay > baseDelay) {
                     currentDelay = Math.max(
                         baseDelay,
                         Math.floor(currentDelay / 2)
@@ -1381,8 +1110,7 @@ async function scan() {
             }
 
             const assets = getPositiveAssets(result);
-            const hasAssets =
-                Object.keys(assets).length > 0;
+            const hasAssets = Object.keys(assets).length > 0;
 
             history.push({
                 missing_word: candidate[cursor.position],
@@ -1416,12 +1144,10 @@ async function scan() {
         }
 
     } catch (error) {
-
         status(
             "خطا: " + String(error.message || error) +
             "\nپیشرفت ذخیره شده است."
         );
-
     } finally {
         running = false;
     }
@@ -1438,21 +1164,15 @@ $("stop").onclick = () => {
 };
 
 $("clear").onclick = () => {
-
     if (running) {
         alert("ابتدا اسکن را متوقف کن.");
         return;
     }
-
     if (confirm("پیشرفت، گزارش‌ها و کل تاریخچه پاک شود؟")) {
-
         localStorage.removeItem("wrs_cursor");
         localStorage.removeItem("wrs_history");
-
         history = [];
-
         render();
-
         status("پیشرفت و تاریخچه پاک شد.");
     }
 };
@@ -1461,7 +1181,6 @@ $("clear").onclick = () => {
 /* ==================== CSV ==================== */
 
 function downloadCSV(filename, rows) {
-
     const csv = rows
         .map(row =>
             row.map(value =>
@@ -1474,36 +1193,25 @@ function downloadCSV(filename, rows) {
         ["\ufeff" + csv],
         { type: "text/csv;charset=utf-8" }
     );
-
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     link.click();
-
     URL.revokeObjectURL(url);
 }
 
 $("csv").onclick = () => {
-
     const rows = [
-        ["Missing Word", "Position", "Network",
-         "Address", "Balance"]
+        ["Missing Word", "Position", "Network", "Address", "Balance"]
     ];
 
     for (const item of history.filter(h => h.has_assets)) {
-
         for (const [network, asset] of Object.entries(item.assets)) {
-
             let balance = "";
-
             if (network.startsWith("BTC_")) {
                 balance = asset.balance_BTC;
-            } else if (
-                network === "ETH" ||
-                network === "BNB"
-            ) {
+            } else if (network === "ETH" || network === "BNB") {
                 balance = asset.balance_native;
             } else if (network === "TRON") {
                 balance = asset.balance_TRX;
@@ -1527,22 +1235,18 @@ $("csv").onclick = () => {
 };
 
 $("csvFull").onclick = () => {
-
     const rows = [
         ["Missing Word", "Position", "Has Assets",
          "Checked At", "Networks With Balance", "Addresses"]
     ];
 
     for (const item of history) {
-
         const networks = item.has_assets
             ? Object.keys(item.assets).join("|")
             : "";
-
         const addrList = item.addresses
             ? Object.entries(item.addresses)
-                .map(([k, v]) => k + "=" + v)
-                .join("|")
+                .map(([k, v]) => k + "=" + v).join("|")
             : "";
 
         rows.push([
