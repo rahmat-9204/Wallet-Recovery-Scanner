@@ -4,116 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wallet Recovery Scanner</title>
-
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f1f4f9;
-    color: #172033;
-    padding: 15px;
-}
-main {
-    max-width: 860px;
-    margin: auto;
-    background: white;
-    padding: 18px;
-    border-radius: 14px;
-}
+body { font-family: Arial, sans-serif; background: #f1f4f9; color: #172033; padding: 15px; }
+main { max-width: 900px; margin: auto; background: white; padding: 18px; border-radius: 14px; }
 h2 { color: #1556b8; }
-textarea,input,button {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 12px;
-    margin: 7px 0;
-    border-radius: 8px;
-    font-size: 15px;
-}
+textarea,input,button { width: 100%; box-sizing: border-box; padding: 12px; margin: 7px 0; border-radius: 8px; font-size: 15px; }
 textarea,input { border: 1px solid #ccd3df; }
-button {
-    border: 0;
-    background: #1556b8;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
-.stop { background: #a52a2a; }
-.clear { background: #555; }
-.report { background: #16834a; }
-.report2 { background: #7a4a00; }
-.warning {
-    background: #fff1d0;
-    color: #674800;
-    padding: 12px;
-    border-radius: 8px;
-    line-height: 1.8;
-}
-.status {
-    background: #edf2fa;
-    padding: 12px;
-    border-radius: 8px;
-    white-space: pre-wrap;
-    line-height: 1.8;
-}
-.result {
-    background: #f8f9fc;
-    border: 1px solid #d5dce8;
-    padding: 12px;
-    border-radius: 8px;
-    margin-top: 10px;
-    direction: ltr;
-    text-align: left;
-    overflow-wrap: anywhere;
-}
-.result.empty {
-    background: #fafafa;
-    border-color: #e0e0e0;
-    opacity: .85;
-    direction: rtl;
-    text-align: right;
-}
-.result.found {
-    border-color: #16834a;
-    box-shadow: 0 0 0 2px #16834a22;
-}
-.small {
-    font-size: 13px;
-    color: #667085;
-    line-height: 1.7;
-}
-.section-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 22px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #e3e8f0;
-}
+button { border: 0; background: #1556b8; color: white; font-weight: bold; cursor: pointer; }
+.stop { background: #a52a2a; } .clear { background: #555; } .report { background: #16834a; } .report2 { background: #7a4a00; }
+.warning { background: #fff1d0; color: #674800; padding: 12px; border-radius: 8px; line-height: 1.8; }
+.status { background: #edf2fa; padding: 12px; border-radius: 8px; white-space: pre-wrap; line-height: 1.8; }
+.result { background: #f8f9fc; border: 1px solid #d5dce8; padding: 12px; border-radius: 8px; margin-top: 10px; direction: ltr; text-align: left; overflow-wrap: anywhere; }
+.result.empty { background: #fafafa; border-color: #e0e0e0; opacity: .85; direction: rtl; text-align: right; }
+.result.found { border-color: #16834a; box-shadow: 0 0 0 2px #16834a22; }
+.small { font-size: 13px; color: #667085; line-height: 1.7; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 22px; padding-bottom: 8px; border-bottom: 2px solid #e3e8f0; }
 .section-head h3 { margin: 0; }
-.counter {
-    font-size: 13px;
-    color: #334;
-    background: #eef3fb;
-    padding: 6px 10px;
-    border-radius: 6px;
-    white-space: nowrap;
-}
+.counter { font-size: 13px; color: #334; background: #eef3fb; padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
 .counter.green { background: #d8f3e2; color: #0d5c2f; }
-.counter.red   { background: #fbe0e0; color: #7a1f1f; }
-.empty-note {
-    color: #8a94a6;
-    font-size: 14px;
-    padding: 10px 0;
-}
+.counter.red { background: #fbe0e0; color: #7a1f1f; }
+.empty-note { color: #8a94a6; font-size: 14px; padding: 10px 0; }
 </style>
 </head>
-
 <body>
 <main>
-
 <h2>Wallet Recovery Scanner</h2>
-
 <p>بررسی عبارت‌های معتبر و نمایش جداگانه دارایی‌ها و موارد بدون موجودی.</p>
 
 <div class="warning">
@@ -124,14 +39,16 @@ button {
 </div>
 
 <h3>۱. وارد کردن ۱۱ کلمه</h3>
-<textarea id="words" rows="4"
-placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></textarea>
+<textarea id="words" rows="4" placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></textarea>
 
 <h3>۲. تعداد عبارت معتبر در هر نوبت (۱۰ تا ۵۰۰)</h3>
 <input id="limit" type="number" value="10" min="10" max="500">
 
 <h3>۳. تاخیر بین عبارت‌ها (میلی‌ثانیه، ۵۰۰ تا ۲۵۰۰)</h3>
 <input id="delay" type="number" value="500" min="500" max="2500">
+
+<h3>۴. کلید API ترون‌گرید (اختیاری، برای جلوگیری از محدودیت نرخ)</h3>
+<input id="tronApiKey" type="text" placeholder="TRON-PRO-API-KEY (اختیاری)">
 
 <button id="start">شروع / ادامه اسکن</button>
 <button id="stop" class="stop">توقف اسکن</button>
@@ -142,7 +59,6 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <h3>وضعیت</h3>
 <div id="status" class="status">آماده شروع</div>
 
-<!-- ================= بخش ۱: دارای موجودی ================= -->
 <div class="section-head">
     <h3>✅ دارایی‌های پیدا شده (دارای موجودی)</h3>
     <span id="counterFound" class="counter green">۰ مورد</span>
@@ -150,7 +66,6 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <div id="foundList"></div>
 <div id="foundEmpty" class="empty-note">هنوز دارایی‌ای پیدا نشده است.</div>
 
-<!-- ================= بخش ۲: بدون موجودی ================= -->
 <div class="section-head">
     <h3>❌ بررسی‌شده‌های بدون موجودی</h3>
     <span id="counterEmpty" class="counter red">۰ مورد</span>
@@ -159,96 +74,52 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <div id="emptyListEmpty" class="empty-note">هنوز عبارت بدون موجودی ثبت نشده است.</div>
 
 <p class="small">
-این نسخه اولین آدرس استاندارد را بررسی می‌کند و همه‌ی شبکه‌ها را موازی چک می‌کند.
-هر عبارت معتبر (چه دارای موجودی، چه بدون موجودی) در تاریخچه ثبت و در بخش مربوطه نمایش داده می‌شود.
-تاخیر بین عبارت‌ها در بازه ۵۰۰ تا ۲۵۰۰ میلی‌ثانیه خودکار تنظیم می‌شود.
+این نسخه اولین آدرس استاندارد هر شبکه را بررسی می‌کند.
+TRX، USDT (ERC20/BEP20/TRC20)، USDC (ERC20/BEP20/Polygon/Arbitrum/Optimism/Base/Avalanche)، BTC (Legacy/Nested/Native SegWit)، ETH و BNB.
+هر عبارت معتبر (چه دارای موجودی، چه بدون موجودی) در تاریخچه ثبت می‌شود.
 </p>
-
 </main>
 
 <script type="module">
-
-import { validateMnemonic, mnemonicToSeedSync }
-    from "https://esm.sh/@scure/bip39@1.6.0";
-import { wordlist }
-    from "https://esm.sh/@scure/bip39@1.6.0/wordlists/english.js";
-import { HDKey }
-    from "https://esm.sh/@scure/bip32@1.6.0";
-import { sha256 }
-    from "https://esm.sh/@noble/hashes@1.5.0/sha256";
-import { ripemd160 }
-    from "https://esm.sh/@noble/hashes@1.5.0/ripemd160";
-import { keccak_256 }
-    from "https://esm.sh/@noble/hashes@1.5.0/sha3";
-import { secp256k1 }
-    from "https://esm.sh/@noble/curves@1.4.0/secp256k1";
-
+import { validateMnemonic, mnemonicToSeedSync } from "https://esm.sh/@scure/bip39@1.6.0";
+import { wordlist } from "https://esm.sh/@scure/bip39@1.6.0/wordlists/english.js";
+import { HDKey } from "https://esm.sh/@scure/bip32@1.6.0";
+import { sha256 } from "https://esm.sh/@noble/hashes@1.5.0/sha256";
+import { ripemd160 } from "https://esm.sh/@noble/hashes@1.5.0/ripemd160";
+import { keccak_256 } from "https://esm.sh/@noble/hashes@1.5.0/sha3";
+import { secp256k1 } from "https://esm.sh/@noble/curves@1.4.0/secp256k1";
 
 const $ = id => document.getElementById(id);
-
-/* ---------- محدوده‌های پیکربندی ---------- */
-const LIMIT_MIN = 10;
-const LIMIT_MAX = 500;
-const DELAY_MIN = 500;
-const DELAY_MAX = 2500;
-
-let stopFlag = false;
-let running = false;
-
-/* history = همه عبارت‌های معتبر بررسی‌شده (با فیلد has_assets) */
+const LIMIT_MIN = 10, LIMIT_MAX = 500, DELAY_MIN = 500, DELAY_MAX = 2500;
+let stopFlag = false, running = false;
 let history = [];
-
-try {
-    history = JSON.parse(localStorage.getItem("wrs_history") || "[]");
-} catch { history = []; }
-
+try { history = JSON.parse(localStorage.getItem("wrs_history") || "[]"); } catch { history = []; }
 
 function status(text) { $("status").textContent = text; }
 
 function concat(...arrays) {
     let length = arrays.reduce((n,a)=>n+a.length,0);
-    let output = new Uint8Array(length);
-    let offset = 0;
-    for (const array of arrays) {
-        output.set(array,offset);
-        offset += array.length;
-    }
+    let output = new Uint8Array(length); let offset = 0;
+    for (const array of arrays) { output.set(array,offset); offset += array.length; }
     return output;
 }
-function hex(bytes) {
-    return [...bytes].map(x=>x.toString(16).padStart(2,"0")).join("");
-}
+function hex(bytes) { return [...bytes].map(x=>x.toString(16).padStart(2,"0")).join(""); }
 function hash160(data) { return ripemd160(sha256(data)); }
-
 function base58(data) {
-    const alphabet =
-        "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    let zeros = 0;
-    while (zeros < data.length && data[zeros] === 0) zeros++;
-    let number = 0n;
-    for (const byte of data) number = number * 256n + BigInt(byte);
-    let output = "";
-    while (number > 0n) {
-        let remainder = Number(number % 58n);
-        output = alphabet[remainder] + output;
-        number /= 58n;
-    }
+    const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let zeros = 0; while (zeros < data.length && data[zeros] === 0) zeros++;
+    let number = 0n; for (const byte of data) number = number * 256n + BigInt(byte);
+    let output = ""; while (number > 0n) { let r = Number(number % 58n); output = alphabet[r] + output; number /= 58n; }
     return "1".repeat(zeros) + output;
 }
-function checksum(data) {
-    return concat(data, sha256(sha256(data)).slice(0,4));
-}
-function base58check(version,payload) {
-    return base58(checksum(concat(new Uint8Array([version]), payload)));
-}
+function checksum(data) { return concat(data, sha256(sha256(data)).slice(0,4)); }
+function base58check(version,payload) { return base58(checksum(concat(new Uint8Array([version]), payload))); }
 
-/* ---------- Bech32 ---------- */
 const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 function polymod(values) {
     let c = 1;
     for (const value of values) {
-        let top = c >>> 25;
-        c = ((c & 0x1ffffff) << 5) ^ value;
+        let top = c >>> 25; c = ((c & 0x1ffffff) << 5) ^ value;
         const g = [0x3b6a57b2,0x26508e6d,0x1ea119fa,0x3d4233dd,0x2a1462b3];
         for (let i=0;i<5;i++) if ((top >>> i) & 1) c ^= g[i];
     }
@@ -256,35 +127,28 @@ function polymod(values) {
 }
 function hrpExpand(hrp) {
     let high = [], low = [];
-    for (const char of hrp) {
-        let v = char.charCodeAt(0);
-        high.push(v >> 5); low.push(v & 31);
-    }
+    for (const char of hrp) { let v = char.charCodeAt(0); high.push(v >> 5); low.push(v & 31); }
     return [...high,0,...low];
 }
 function convertBits(data,from,to,pad) {
-    let acc = 0, bits = 0, output = [];
-    const maxValue = (1 << to) - 1;
+    let acc = 0, bits = 0, output = []; const maxValue = (1 << to) - 1;
     for (const v of data) {
         if (v < 0 || (v >> from)) throw Error("Invalid bit conversion");
         acc = (acc << from) | v; bits += from;
         while (bits >= to) { bits -= to; output.push((acc >> bits) & maxValue); }
     }
     if (pad) { if (bits) output.push((acc << (to-bits)) & maxValue); }
-    else if (bits >= from || ((acc << (to-bits)) & maxValue))
-        throw Error("Invalid padding");
+    else if (bits >= from || ((acc << (to-bits)) & maxValue)) throw Error("Invalid padding");
     return output;
 }
 function bech32(hrp,version,program) {
     const data = [version, ...convertBits(program,8,5,true)];
     const values = [...hrpExpand(hrp), ...data, 0,0,0,0,0,0];
-    const mod = polymod(values) ^ 1;
-    let cs = [];
+    const mod = polymod(values) ^ 1; let cs = [];
     for (let i=0;i<6;i++) cs.push((mod >>> (5*(5-i))) & 31);
     return hrp + "1" + [...data,...cs].map(x=>BECH32[x]).join("");
 }
 
-/* ---------- Derivation ---------- */
 function getPublicKey(seed,path,compressed=true) {
     const root = HDKey.fromMasterSeed(seed);
     const node = root.derive(path);
@@ -296,57 +160,42 @@ function bitcoinAddresses(seed) {
     const nestedPub = getPublicKey(seed, "m/49'/0'/0'/0/0");
     const nativePub = getPublicKey(seed, "m/84'/0'/0'/0/0");
     return {
-        BTC_Legacy:       base58check(0, hash160(legacyPub)),
+        BTC_Legacy: base58check(0, hash160(legacyPub)),
         BTC_NestedSegWit: base58check(5, hash160(concat(new Uint8Array([0,20]), hash160(nestedPub)))),
         BTC_NativeSegWit: bech32("bc",0,hash160(nativePub))
     };
 }
 function evmAddress(seed) {
     const pk = getPublicKey(seed, "m/44'/60'/0'/0/0", false);
-    const h = keccak_256(pk.slice(1));
-    return "0x" + hex(h.slice(-20));
+    const h = keccak_256(pk.slice(1)); return "0x" + hex(h.slice(-20));
 }
 function tronAddress(seed) {
     const pk = getPublicKey(seed, "m/44'/195'/0'/0/0", false);
     const h = keccak_256(pk.slice(1));
-    const payload = concat(new Uint8Array([0x41]), h.slice(-20));
-    return base58(checksum(payload));
+    return base58(checksum(concat(new Uint8Array([0x41]), h.slice(-20))));
 }
 
-/* ---------- Network APIs ---------- */
 let RPC_ID = 0;
 async function fetchJSON(url,options={}) {
     const controller = new AbortController();
     const timeout = setTimeout(()=>controller.abort(), 15000);
     try {
         const response = await fetch(url,{...options, signal:controller.signal});
-        if (!response.ok) {
-            const err = Error("HTTP "+response.status);
-            err.status = response.status; throw err;
-        }
+        if (!response.ok) { const err = Error("HTTP "+response.status); err.status = response.status; throw err; }
         return await response.json();
     } finally { clearTimeout(timeout); }
 }
 
 async function checkBTC(address) {
-    const data = await fetchJSON(
-        "https://blockstream.info/api/address/" + encodeURIComponent(address));
+    const data = await fetchJSON("https://blockstream.info/api/address/" + encodeURIComponent(address));
     const confirmed = data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum;
     const unconfirmed = data.mempool_stats.funded_txo_sum - data.mempool_stats.spent_txo_sum;
-    return {
-        balance_satoshis: confirmed + unconfirmed,
-        balance_BTC: (confirmed + unconfirmed) / 100000000,
-        transaction_count: data.chain_stats.tx_count + data.mempool_stats.tx_count
-    };
+    return { balance_satoshis: confirmed + unconfirmed, balance_BTC: (confirmed + unconfirmed) / 100000000 };
 }
 
 async function rpc(url,method,params) {
     const id = ++RPC_ID;
-    const data = await fetchJSON(url,{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify({ jsonrpc:"2.0", id, method, params })
-    });
+    const data = await fetchJSON(url,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ jsonrpc:"2.0", id, method, params }) });
     if (data.error) throw Error(data.error.message || "RPC error");
     return data.result;
 }
@@ -354,39 +203,21 @@ async function checkEVM(url,address) {
     const balance = await rpc(url, "eth_getBalance", [address,"latest"]);
     return { balance_wei: BigInt(balance).toString() };
 }
-function makeBalanceOfData(address) {
-    return "0x70a08231" + address.slice(2).toLowerCase().padStart(64,"0");
-}
+function makeBalanceOfData(address) { return "0x70a08231" + address.slice(2).toLowerCase().padStart(64,"0"); }
 async function checkUSDT_EVM(url,address,contract,decimals) {
-    const data = await rpc(url, "eth_call",
-        [{ to:contract, data:makeBalanceOfData(address) }, "latest"]);
+    const data = await rpc(url, "eth_call", [{ to:contract, data:makeBalanceOfData(address) }, "latest"]);
     const raw = BigInt(data || "0x0");
     return { raw: raw.toString(), balance: Number(raw)/Math.pow(10,decimals), decimals };
 }
 
-/* ---------- USDC ---------- */
 const USDC_NETWORKS = {
-    USDC_ERC20:    { rpc:"https://ethereum-rpc.publicnode.com",
-                     contract:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-                     decimals:6, addressKey:"ETH" },
-    USDC_BEP20:    { rpc:"https://bsc-rpc.publicnode.com",
-                     contract:"0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-                     decimals:18, addressKey:"BNB" },
-    USDC_Polygon:  { rpc:"https://polygon-bor-rpc.publicnode.com",
-                     contract:"0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-                     decimals:6, addressKey:"ETH" },
-    USDC_Arbitrum: { rpc:"https://arbitrum-one-rpc.publicnode.com",
-                     contract:"0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-                     decimals:6, addressKey:"ETH" },
-    USDC_Optimism: { rpc:"https://optimism-rpc.publicnode.com",
-                     contract:"0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-                     decimals:6, addressKey:"ETH" },
-    USDC_Base:     { rpc:"https://base-rpc.publicnode.com",
-                     contract:"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                     decimals:6, addressKey:"ETH" },
-    USDC_Avalanche:{ rpc:"https://avalanche-c-chain-rpc.publicnode.com",
-                     contract:"0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
-                     decimals:6, addressKey:"ETH" }
+    USDC_ERC20: { rpc:"https://ethereum-rpc.publicnode.com", contract:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals:6, addressKey:"ETH" },
+    USDC_BEP20: { rpc:"https://bsc-rpc.publicnode.com", contract:"0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", decimals:18, addressKey:"BNB" },
+    USDC_Polygon: { rpc:"https://polygon-bor-rpc.publicnode.com", contract:"0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", decimals:6, addressKey:"ETH" },
+    USDC_Arbitrum: { rpc:"https://arbitrum-one-rpc.publicnode.com", contract:"0xaf88d065e77c8cC2239327C5EDb3A432268e5831", decimals:6, addressKey:"ETH" },
+    USDC_Optimism: { rpc:"https://optimism-rpc.publicnode.com", contract:"0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", decimals:6, addressKey:"ETH" },
+    USDC_Base: { rpc:"https://base-rpc.publicnode.com", contract:"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals:6, addressKey:"ETH" },
+    USDC_Avalanche: { rpc:"https://avalanche-c-chain-rpc.publicnode.com", contract:"0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E", decimals:6, addressKey:"ETH" }
 };
 
 async function checkUSDC_NETWORKS(addresses) {
@@ -396,432 +227,202 @@ async function checkUSDC_NETWORKS(addresses) {
             .then(data => { checks[name] = data; })
             .catch(error => { checks[name] = { error:String(error.message||error) }; })
     );
-    await Promise.allSettled(jobs);
-    return checks;
+    await Promise.allSettled(jobs); return checks;
 }
 
-/* ---------- TRON ---------- */
 const USDT_TRON_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
+async function fetchTronAccount(address, retries = 3) {
+    const apiKey = $("tronApiKey").value.trim();
+    const headers = { "accept": "application/json" };
+    if (apiKey) headers["TRON-PRO-API-KEY"] = apiKey;
+    for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+            return await fetchJSON("https://api.trongrid.io/v1/accounts/" + encodeURIComponent(address), { headers });
+        } catch (e) {
+            if (e.status === 429 || e.status === 403) { await new Promise(r => setTimeout(r, 2000 * (attempt + 1))); continue; }
+            throw e;
+        }
+    }
+    throw Error("TronGrid rate limit: تلاش مجدد ناموفق");
+}
+
 async function checkTRON(address) {
-    const account = await fetchJSON(
-        "https://api.trongrid.io/v1/accounts/" + encodeURIComponent(address));
-    const data = (account.data && account.data.length) ? account.data[0] : null;
-    return {
-        balance_sun: data ? data.balance : 0,
-        balance_TRX: data ? data.balance/1000000 : 0,
-        tokens: (data && Array.isArray(data.trc20)) ? data.trc20 : []
-    };
+    const account = await fetchTronAccount(address);
+    if (!account || !account.data || account.data.length === 0) {
+        return { activated: false, balance_sun: 0, balance_TRX: 0, tokens: [] };
+    }
+    const data = account.data[0];
+    return { activated: true, balance_sun: data.balance || 0, balance_TRX: (data.balance || 0) / 1000000, tokens: Array.isArray(data.trc20) ? data.trc20 : [] };
 }
 function checkTRON_USDT(tronData) {
     for (const token of (tronData.tokens || [])) {
         const balance = token[USDT_TRON_CONTRACT];
-        if (balance !== undefined) {
-            const raw = BigInt(balance);
-            return { raw: raw.toString(), balance: Number(raw)/1000000 };
-        }
+        if (balance !== undefined) { const raw = BigInt(balance); return { raw: raw.toString(), balance: Number(raw)/1000000 }; }
     }
     return { raw:"0", balance:0 };
 }
 
-/* ---------- نگاشت صریح شبکه به آدرس ---------- */
-const USDT_ADDRESS_KEY = {
-    USDT_ERC20: "ETH",
-    USDT_BEP20: "BNB",
-    USDT_TRC20: "TRON"
-};
+const USDT_ADDRESS_KEY = { USDT_ERC20: "ETH", USDT_BEP20: "BNB", USDT_TRC20: "TRON" };
 
 function getPositiveAssets(result) {
     const positive = {};
     for (const [network,data] of Object.entries(result.checks)) {
         if (!data || data.error) continue;
-
         if (network.startsWith("BTC_")) {
-            if (Number(data.balance_satoshis || 0) > 0) {
-                positive[network] = {
-                    address: result.addresses[network],
-                    balance_BTC: data.balance_BTC
-                };
-            }
+            if (Number(data.balance_satoshis || 0) > 0) positive[network] = { address: result.addresses[network], balance_BTC: data.balance_BTC };
         }
         if (network === "ETH" || network === "BNB") {
-            if (BigInt(data.balance_wei || "0") > 0n) {
-                positive[network] = {
-                    address: result.addresses[network],
-                    balance_native: Number(data.balance_wei)/1e18
-                };
-            }
+            if (BigInt(data.balance_wei || "0") > 0n) positive[network] = { address: result.addresses[network], balance_native: Number(data.balance_wei)/1e18 };
         }
         if (network === "TRON") {
-            if (Number(data.balance_sun || 0) > 0) {
-                positive[network] = {
-                    address: result.addresses[network],
-                    balance_TRX: data.balance_TRX
-                };
-            }
+            if (Number(data.balance_sun || 0) > 0) positive[network] = { address: result.addresses[network], balance_TRX: data.balance_TRX };
         }
         if (network.startsWith("USDT_")) {
-            if (Number(data.balance || 0) > 0) {
-                positive[network] = {
-                    address: result.addresses[USDT_ADDRESS_KEY[network] || "ETH"],
-                    balance_USDT: data.balance
-                };
-            }
+            if (Number(data.balance || 0) > 0) positive[network] = { address: result.addresses[USDT_ADDRESS_KEY[network] || "ETH"], balance_USDT: data.balance };
         }
         if (network.startsWith("USDC_")) {
-            if (Number(data.balance || 0) > 0) {
-                positive[network] = {
-                    address: result.addresses[USDC_NETWORKS[network].addressKey],
-                    balance_USDC: data.balance
-                };
-            }
+            if (Number(data.balance || 0) > 0) positive[network] = { address: result.addresses[USDC_NETWORKS[network].addressKey], balance_USDC: data.balance };
         }
     }
     return positive;
 }
 
-/* ---------- ذخیره و ادامه ---------- */
-function getCursor() {
-    try {
-        return JSON.parse(localStorage.getItem("wrs_cursor") ||
-            '{"position":0,"index":0,"valid":0}');
-    } catch { return { position:0, index:0, valid:0 }; }
-}
+function getCursor() { try { return JSON.parse(localStorage.getItem("wrs_cursor") || '{"position":0,"index":0,"valid":0}'); } catch { return { position:0, index:0, valid:0 }; } }
 function saveCursor(c) { localStorage.setItem("wrs_cursor", JSON.stringify(c)); }
 function saveHistory() { localStorage.setItem("wrs_history", JSON.stringify(history)); }
 
-/* ---------- رندر جداگانه دو بخش ---------- */
 function renderFound() {
     const list = history.filter(h => h.has_assets).slice().reverse();
     $("counterFound").textContent = list.length + " مورد";
     $("foundEmpty").style.display = list.length ? "none" : "block";
-
-    const container = $("foundList");
-    container.innerHTML = "";
-
+    const container = $("foundList"); container.innerHTML = "";
     for (const item of list) {
-        const box = document.createElement("div");
-        box.className = "result found";
-
-        const title = document.createElement("h3");
-        title.textContent = "✅ دارایی پیدا شد";
-
-        const word = document.createElement("p");
-        word.textContent = "کلمه گمشده: " + item.missing_word;
-
-        const position = document.createElement("p");
-        position.textContent = "جایگاه کلمه: " + item.missing_position;
-
-        const time = document.createElement("p");
-        time.textContent = "زمان بررسی: " + (item.checked_at || "-");
-
-        box.appendChild(title);
-        box.appendChild(word);
-        box.appendChild(position);
-        box.appendChild(time);
-
+        const box = document.createElement("div"); box.className = "result found";
+        box.innerHTML = `<h3>✅ دارایی پیدا شد</h3><p>کلمه گمشده: ${item.missing_word}</p><p>جایگاه کلمه: ${item.missing_position}</p><p>زمان بررسی: ${item.checked_at || "-"}</p>`;
         for (const [network,asset] of Object.entries(item.assets)) {
-            const section = document.createElement("div");
-            section.style.borderTop = "1px solid #ddd";
-            section.style.paddingTop = "8px";
-
-            const name = document.createElement("h4");
-            name.textContent = network;
-
-            const address = document.createElement("p");
-            address.textContent = "آدرس: " + asset.address;
-
-            const balance = document.createElement("p");
-            if (network.startsWith("BTC_")) balance.textContent = "موجودی BTC: " + asset.balance_BTC;
-            else if (network === "ETH") balance.textContent = "موجودی ETH: " + asset.balance_native;
-            else if (network === "BNB") balance.textContent = "موجودی BNB: " + asset.balance_native;
-            else if (network === "TRON") balance.textContent = "موجودی TRX: " + asset.balance_TRX;
-            else if (network.startsWith("USDT_")) balance.textContent = "موجودی USDT: " + asset.balance_USDT;
-            else if (network.startsWith("USDC_")) balance.textContent = "موجودی USDC: " + asset.balance_USDC;
-
-            section.appendChild(name);
-            section.appendChild(address);
-            section.appendChild(balance);
+            const section = document.createElement("div"); section.style.borderTop = "1px solid #ddd"; section.style.paddingTop = "8px";
+            let balance = "";
+            if (network.startsWith("BTC_")) balance = "موجودی BTC: " + asset.balance_BTC;
+            else if (network === "ETH") balance = "موجودی ETH: " + asset.balance_native;
+            else if (network === "BNB") balance = "موجودی BNB: " + asset.balance_native;
+            else if (network === "TRON") balance = "موجودی TRX: " + asset.balance_TRX;
+            else if (network.startsWith("USDT_")) balance = "موجودی USDT: " + asset.balance_USDT;
+            else if (network.startsWith("USDC_")) balance = "موجودی USDC: " + asset.balance_USDC;
+            section.innerHTML = `<h4>${network}</h4><p>آدرس: ${asset.address}</p><p>${balance}</p>`;
             box.appendChild(section);
         }
-
         container.appendChild(box);
     }
 }
-
 function renderEmpty() {
     const list = history.filter(h => !h.has_assets).slice().reverse();
     $("counterEmpty").textContent = list.length + " مورد";
     $("emptyListEmpty").style.display = list.length ? "none" : "block";
-
-    const container = $("emptyList");
-    container.innerHTML = "";
-
+    const container = $("emptyList"); container.innerHTML = "";
     for (const item of list) {
-        const box = document.createElement("div");
-        box.className = "result empty";
-
-        const title = document.createElement("h3");
-        title.textContent = "— بدون دارایی";
-
-        const word = document.createElement("p");
-        word.textContent = "کلمه گمشده: " + item.missing_word;
-
-        const position = document.createElement("p");
-        position.textContent = "جایگاه کلمه: " + item.missing_position;
-
-        const time = document.createElement("p");
-        time.textContent = "زمان بررسی: " + (item.checked_at || "-");
-
-        box.appendChild(title);
-        box.appendChild(word);
-        box.appendChild(position);
-        box.appendChild(time);
-
+        const box = document.createElement("div"); box.className = "result empty";
+        box.innerHTML = `<h3>— بدون دارایی</h3><p>کلمه گمشده: ${item.missing_word}</p><p>جایگاه کلمه: ${item.missing_position}</p><p>زمان بررسی: ${item.checked_at || "-"}</p>`;
         container.appendChild(box);
     }
 }
+function render() { renderFound(); renderEmpty(); }
 
-function render() {
-    renderFound();
-    renderEmpty();
-}
-
-/* ---------- Scanner ---------- */
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
-
 function hasRateLimitError(result) {
     for (const data of Object.values(result.checks)) {
         if (!data || !data.error) continue;
         const msg = String(data.error);
-        if (msg.includes("429") ||
-            msg.toLowerCase().includes("rate") ||
-            msg.toLowerCase().includes("too many")) return true;
+        if (msg.includes("429") || msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("too many")) return true;
     }
     return false;
 }
-
 function readConfig() {
-    let limit = Number($("limit").value);
-    if (!Number.isFinite(limit)) limit = LIMIT_MIN;
+    let limit = Number($("limit").value); if (!Number.isFinite(limit)) limit = LIMIT_MIN;
     limit = Math.max(LIMIT_MIN, Math.min(LIMIT_MAX, Math.floor(limit)));
-
-    let delay = Number($("delay").value);
-    if (!Number.isFinite(delay)) delay = DELAY_MIN;
+    let delay = Number($("delay").value); if (!Number.isFinite(delay)) delay = DELAY_MIN;
     delay = Math.max(DELAY_MIN, Math.min(DELAY_MAX, Math.floor(delay)));
-
     return { limit, delay };
 }
 
 async function scan() {
     if (running) return;
-    running = true;
-    stopFlag = false;
-
-    const words = $("words").value.trim().toLowerCase()
-        .split(/\s+/).filter(Boolean);
-
-    if (words.length !== 11) {
-        status("خطا: دقیقاً ۱۱ کلمه وارد کن.");
-        running = false; return;
-    }
-    if (words.some(w=>!wordlist.includes(w))) {
-        status("خطا: یک یا چند کلمه در فهرست BIP39 نیست.");
-        running = false; return;
-    }
+    running = true; stopFlag = false;
+    const words = $("words").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length !== 11) { status("خطا: دقیقاً ۱۱ کلمه وارد کن."); running = false; return; }
+    if (words.some(w=>!wordlist.includes(w))) { status("خطا: یک یا چند کلمه در فهرست BIP39 نیست."); running = false; return; }
 
     let cursor = getCursor();
     const { limit, delay: baseDelay } = readConfig();
-
-    let currentDelay = baseDelay;
-    let successStreak = 0;
-    let checked = 0;
-
-    status(
-        "اسکن شروع شد.\n" +
-        "سقف این نوبت: " + limit + " عبارت معتبر\n" +
-        "تأخیر شروع: " + baseDelay + " ms"
-    );
+    let currentDelay = baseDelay, successStreak = 0, checked = 0;
+    status("اسکن شروع شد.\nسقف این نوبت: " + limit + " عبارت معتبر\nتأخیر شروع: " + baseDelay + " ms");
 
     try {
         while (cursor.position < 12 && checked < limit && !stopFlag) {
-
-            if (cursor.index >= 2048) {
-                cursor.position++;
-                cursor.index = 0;
-                saveCursor(cursor);
-                continue;
-            }
-
-            const candidate = words.slice();
-            candidate.splice(cursor.position, 0, wordlist[cursor.index]);
-
-            if (!validateMnemonic(candidate.join(" "), wordlist)) {
-                cursor.index++;
-                saveCursor(cursor);
-                continue;
-            }
-
-            cursor.valid++;
-            checked++;
-
-            status(
-                "عبارت معتبر شماره: " + cursor.valid +
-                "\nدر این نوبت: " + checked + " / " + limit +
-                "\nجایگاه در حال بررسی: " + (cursor.position+1) +
-                "\nتأخیر فعلی: " + currentDelay + " ms" +
-                "\nدر حال بررسی موازی همه شبکه‌ها..."
-            );
+            if (cursor.index >= 2048) { cursor.position++; cursor.index = 0; saveCursor(cursor); continue; }
+            const candidate = words.slice(); candidate.splice(cursor.position, 0, wordlist[cursor.index]);
+            if (!validateMnemonic(candidate.join(" "), wordlist)) { cursor.index++; saveCursor(cursor); continue; }
+            cursor.valid++; checked++;
+            status("عبارت معتبر شماره: " + cursor.valid + "\nدر این نوبت: " + checked + " / " + limit + "\nجایگاه: " + (cursor.position+1) + "\nتأخیر: " + currentDelay + " ms");
 
             const mnemonic = candidate.join(" ");
             const seed = mnemonicToSeedSync(mnemonic);
-
-            const addresses = {
-                ...bitcoinAddresses(seed),
-                ETH: evmAddress(seed),
-                BNB: evmAddress(seed), /* همان آدرس ETH */
-                TRON: tronAddress(seed)
-            };
-
+            const addresses = { ...bitcoinAddresses(seed), ETH: evmAddress(seed), BNB: evmAddress(seed), TRON: tronAddress(seed) };
             const result = { addresses, checks:{} };
             const jobs = [];
 
             for (const net of ["BTC_Legacy","BTC_NestedSegWit","BTC_NativeSegWit"]) {
-                jobs.push(checkBTC(addresses[net])
-                    .then(d => { result.checks[net] = d; })
-                    .catch(e => { result.checks[net] = { error:String(e.message||e) }; }));
+                jobs.push(checkBTC(addresses[net]).then(d => { result.checks[net] = d; }).catch(e => { result.checks[net] = { error:String(e.message||e) }; }));
             }
-
-            jobs.push(checkEVM("https://ethereum-rpc.publicnode.com", addresses.ETH)
-                .then(d => { result.checks.ETH = d; })
-                .catch(e => { result.checks.ETH = { error:String(e.message||e) }; }));
-
-            jobs.push(checkUSDT_EVM("https://ethereum-rpc.publicnode.com",
-                addresses.ETH, "0xdAC17F958D2ee523a2206206994597C13D831ec7", 6)
-                .then(d => { result.checks.USDT_ERC20 = d; })
-                .catch(e => { result.checks.USDT_ERC20 = { error:String(e.message||e) }; }));
-
-            jobs.push(checkEVM("https://bsc-rpc.publicnode.com", addresses.BNB)
-                .then(d => { result.checks.BNB = d; })
-                .catch(e => { result.checks.BNB = { error:String(e.message||e) }; }));
-
-            jobs.push(checkUSDT_EVM("https://bsc-rpc.publicnode.com",
-                addresses.BNB, "0x55d398326f99059fF775485246999027B3197955", 18)
-                .then(d => { result.checks.USDT_BEP20 = d; })
-                .catch(e => { result.checks.USDT_BEP20 = { error:String(e.message||e) }; }));
-
-            jobs.push(checkUSDC_NETWORKS(addresses)
-                .then(usdc => {
-                    for (const [n,d] of Object.entries(usdc)) result.checks[n] = d;
-                }));
-
-            jobs.push(checkTRON(addresses.TRON)
-                .then(d => {
-                    result.checks.TRON = d;
-                    result.checks.USDT_TRC20 = checkTRON_USDT(d);
-                })
-                .catch(e => {
-                    result.checks.TRON = { error:String(e.message||e) };
-                    result.checks.USDT_TRC20 = { error:String(e.message||e) };
-                }));
+            jobs.push(checkEVM("https://ethereum-rpc.publicnode.com", addresses.ETH).then(d => { result.checks.ETH = d; }).catch(e => { result.checks.ETH = { error:String(e.message||e) }; }));
+            jobs.push(checkUSDT_EVM("https://ethereum-rpc.publicnode.com", addresses.ETH, "0xdAC17F958D2ee523a2206206994597C13D831ec7", 6).then(d => { result.checks.USDT_ERC20 = d; }).catch(e => { result.checks.USDT_ERC20 = { error:String(e.message||e) }; }));
+            jobs.push(checkEVM("https://bsc-rpc.publicnode.com", addresses.BNB).then(d => { result.checks.BNB = d; }).catch(e => { result.checks.BNB = { error:String(e.message||e) }; }));
+            jobs.push(checkUSDT_EVM("https://bsc-rpc.publicnode.com", addresses.BNB, "0x55d398326f99059fF775485246999027B3197955", 18).then(d => { result.checks.USDT_BEP20 = d; }).catch(e => { result.checks.USDT_BEP20 = { error:String(e.message||e) }; }));
+            jobs.push(checkUSDC_NETWORKS(addresses).then(usdc => { for (const [n,d] of Object.entries(usdc)) result.checks[n] = d; }));
+            jobs.push(checkTRON(addresses.TRON).then(d => { result.checks.TRON = d; result.checks.USDT_TRC20 = checkTRON_USDT(d); }).catch(e => { result.checks.TRON = { error:String(e.message||e) }; result.checks.USDT_TRC20 = { error:String(e.message||e) }; }));
 
             await Promise.allSettled(jobs);
 
-            /* تنظیم خودکار تأخیر در بازه ۵۰۰..۲۵۰۰ */
             if (hasRateLimitError(result)) {
-                successStreak = 0;
-                currentDelay = Math.min(DELAY_MAX,
-                    Math.max(DELAY_MIN, Math.floor(currentDelay * 2)));
-                $("delay").value = currentDelay;
+                successStreak = 0; currentDelay = Math.min(DELAY_MAX, Math.max(DELAY_MIN, Math.floor(currentDelay * 2))); $("delay").value = currentDelay;
             } else {
                 successStreak++;
-                if (successStreak >= 3 && currentDelay > baseDelay) {
-                    currentDelay = Math.max(baseDelay, Math.floor(currentDelay / 2));
-                    successStreak = 0;
-                    $("delay").value = currentDelay;
-                }
+                if (successStreak >= 3 && currentDelay > baseDelay) { currentDelay = Math.max(baseDelay, Math.floor(currentDelay / 2)); successStreak = 0; $("delay").value = currentDelay; }
             }
 
             const assets = getPositiveAssets(result);
             const hasAssets = Object.keys(assets).length > 0;
-            const now = new Date().toISOString();
+            history.push({ missing_word: candidate[cursor.position], missing_position: cursor.position + 1, has_assets: hasAssets, assets: hasAssets ? assets : {}, addresses, checked_at: new Date().toISOString() });
+            saveHistory(); render();
 
-            /* ثبت در تاریخچه کامل — همیشه */
-            history.push({
-                missing_word: candidate[cursor.position],
-                missing_position: cursor.position + 1,
-                has_assets: hasAssets,
-                assets: hasAssets ? assets : {},
-                addresses,
-                checked_at: now
-            });
-            saveHistory();
-
-            if (hasAssets) {
-                status(
-                    "✅ دارایی پیدا شد!\n" +
-                    "کلمه گمشده: " + candidate[cursor.position] +
-                    "\nجایگاه کلمه: " + (cursor.position+1)
-                );
-            }
-
-            render();
-
-            cursor.index++;
-            saveCursor(cursor);
-            candidate.fill("");
-
+            cursor.index++; saveCursor(cursor); candidate.fill("");
             await sleep(currentDelay);
         }
-
-        if (cursor.position >= 12) {
-            status("بررسی تمام جایگاه‌ها پایان یافت.");
-        } else if (stopFlag) {
-            status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
-        } else {
-            status("این نوبت تمام شد.\n" + checked +
-                " عبارت معتبر بررسی شد.\nبرای ادامه دوباره شروع را بزن.");
-        }
-
+        if (cursor.position >= 12) status("بررسی تمام جایگاه‌ها پایان یافت.");
+        else if (stopFlag) status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
+        else status("این نوبت تمام شد.\n" + checked + " عبارت معتبر بررسی شد.\nبرای ادامه دوباره شروع را بزن.");
     } catch(error) {
-        status("خطا: " + String(error.message||error) +
-            "\nپیشرفت ذخیره شده است.");
-    } finally {
-        running = false;
-    }
+        status("خطا: " + String(error.message||error) + "\nپیشرفت ذخیره شده است.");
+    } finally { running = false; }
 }
 
-/* ---------- Buttons ---------- */
 $("start").onclick = scan;
-
-$("stop").onclick = () => {
-    stopFlag = true;
-    status("درخواست توقف ثبت شد.");
-};
-
+$("stop").onclick = () => { stopFlag = true; status("درخواست توقف ثبت شد."); };
 $("clear").onclick = () => {
     if (running) { alert("ابتدا اسکن را متوقف کن."); return; }
     if (confirm("پیشرفت، گزارش‌ها و کل تاریخچه پاک شود؟")) {
-        localStorage.removeItem("wrs_cursor");
-        localStorage.removeItem("wrs_history");
-        history = [];
-        render();
-        status("پیشرفت و تاریخچه پاک شد.");
+        localStorage.removeItem("wrs_cursor"); localStorage.removeItem("wrs_history");
+        history = []; render(); status("پیشرفت و تاریخچه پاک شد.");
     }
 };
 
-/* ---------- CSV ---------- */
 function downloadCSV(filename, rows) {
-    const csv = rows.map(row =>
-        row.map(v => '"' + String(v).replaceAll('"','""') + '"').join(",")
-    ).join("\n");
+    const csv = rows.map(row => row.map(v => '"' + String(v).replaceAll('"','""') + '"').join(",")).join("\n");
     const blob = new Blob(["\ufeff"+csv], { type:"text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = filename; link.click();
-    URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob); const link = document.createElement("a");
+    link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
 }
 
-/* CSV دارایی‌ها — فقط موارد دارای موجودی */
 $("csv").onclick = () => {
     const rows = [["Missing Word","Position","Network","Address","Balance"]];
     for (const item of history.filter(h => h.has_assets)) {
@@ -832,40 +433,23 @@ $("csv").onclick = () => {
             else if (network === "TRON") balance = asset.balance_TRX;
             else if (network.startsWith("USDT_")) balance = asset.balance_USDT;
             else if (network.startsWith("USDC_")) balance = asset.balance_USDC;
-
-            rows.push([item.missing_word, item.missing_position,
-                       network, asset.address, balance]);
+            rows.push([item.missing_word, item.missing_position, network, asset.address, balance]);
         }
     }
     downloadCSV("wallet-found-assets.csv", rows);
 };
 
-/* CSV تاریخچه کامل — همه موارد، با ستون has_assets */
 $("csvFull").onclick = () => {
-    const rows = [["Missing Word","Position","Has Assets",
-                   "Checked At","Networks With Balance","Addresses"]];
+    const rows = [["Missing Word","Position","Has Assets","Checked At","Networks With Balance","Addresses"]];
     for (const item of history) {
-        const networks = item.has_assets
-            ? Object.keys(item.assets).join("|")
-            : "";
-        const addrList = item.addresses
-            ? Object.entries(item.addresses)
-                .map(([k,v]) => k+"="+v).join("|")
-            : "";
-        rows.push([
-            item.missing_word,
-            item.missing_position,
-            item.has_assets ? "YES" : "NO",
-            item.checked_at || "",
-            networks,
-            addrList
-        ]);
+        const networks = item.has_assets ? Object.keys(item.assets).join("|") : "";
+        const addrList = item.addresses ? Object.entries(item.addresses).map(([k,v]) => k+"="+v).join("|") : "";
+        rows.push([item.missing_word, item.missing_position, item.has_assets ? "YES" : "NO", item.checked_at || "", networks, addrList]);
     }
     downloadCSV("wallet-full-history.csv", rows);
 };
 
 render();
-
 </script>
 </body>
 </html>
