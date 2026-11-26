@@ -13,13 +13,14 @@ body {
     padding: 15px;
 }
 main {
-    max-width: 750px;
+    max-width: 800px;
     margin: auto;
     background: white;
     padding: 18px;
     border-radius: 14px;
 }
 h2 { color: #1556b8; }
+h3 { color: #1556b8; margin-top: 24px; }
 textarea,input,button {
     width: 100%;
     box-sizing: border-box;
@@ -34,6 +35,7 @@ button {
     background: #1556b8;
     color: white;
     font-weight: bold;
+    cursor: pointer;
 }
 .stop { background: #a52a2a; }
 .clear { background: #555; }
@@ -62,6 +64,26 @@ button {
     text-align: left;
     overflow-wrap: anywhere;
 }
+.result.with-balance {
+    border-right: 5px solid #16834a;
+}
+.result.with-history {
+    border-right: 5px solid #1556b8;
+}
+.result.empty {
+    border-right: 5px solid #999;
+    opacity: 0.85;
+}
+.section-title {
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-top: 20px;
+    color: white;
+}
+.section-balance { background: #16834a; }
+.section-history { background: #1556b8; }
+.section-empty   { background: #666; }
 .small {
     font-size: 13px;
     color: #667085;
@@ -70,8 +92,20 @@ button {
 .row {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
-.row > div { flex: 1; }
+.row > div { flex: 1; min-width: 180px; }
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 6px;
+}
+.badge-green { background: #d4f4e2; color: #0a5f34; }
+.badge-blue  { background: #d7e6ff; color: #0b3a8a; }
+.badge-gray  { background: #e5e5e5; color: #444; }
 </style>
 </head>
 
@@ -80,7 +114,7 @@ button {
 
 <h2>Wallet Recovery Scanner</h2>
 
-<p>بررسی عبارت‌های معتبر و نمایش دارایی‌های مثبت.</p>
+<p>بررسی عبارت‌های معتبر، دارایی‌ها و تاریخچه تراکنش‌ها.</p>
 
 <div class="warning">
 <strong>هشدار امنیتی:</strong>
@@ -102,11 +136,11 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <input id="limit" type="number" value="5" min="1" max="500">
 </div>
 <div>
-<label class="small">حداقل تاخیر بین درخواست‌ها (میلی‌ثانیه)</label>
+<label class="small">حداقل تاخیر (ms)</label>
 <input id="delayMin" type="number" value="2000" min="500" max="60000" step="100">
 </div>
 <div>
-<label class="small">حداکثر تاخیر بین درخواست‌ها (میلی‌ثانیه)</label>
+<label class="small">حداکثر تاخیر (ms)</label>
 <input id="delayMax" type="number" value="5000" min="1000" max="120000" step="100">
 </div>
 </div>
@@ -119,12 +153,27 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <h3>وضعیت</h3>
 <div id="status" class="status">آماده شروع</div>
 
-<h3>دارایی‌های پیدا شده</h3>
-<div id="results"></div>
+<!-- ============ بخش ۱: با موجودی ============ -->
+<div class="section-title section-balance">
+🟢 ولت‌های با موجودی (<span id="countBalance">0</span>)
+</div>
+<div id="resultsBalance"></div>
+
+<!-- ============ بخش ۲: با تاریخچه ============ -->
+<div class="section-title section-history">
+🔵 ولت‌های با تاریخچه تراکنش (موجودی صفر) (<span id="countHistory">0</span>)
+</div>
+<div id="resultsHistory"></div>
+
+<!-- ============ بخش ۳: خالی ============ -->
+<div class="section-title section-empty">
+⚪ ولت‌های خالی (بدون موجودی و بدون تاریخچه) (<span id="countEmpty">0</span>)
+</div>
+<div id="resultsEmpty"></div>
 
 <p class="small">
-در صورت خطای 429 / rate-limit، تاخیر به‌طور خودکار افزایش می‌یابد
-(تا حداکثر ۳۰ ثانیه) و پس از موفقیت‌های پیاپی به‌تدریج کاهش می‌یابد.
+بررسی شبکه‌ها به صورت موازی انجام می‌شود.
+در صورت خطای 429، تاخیر به‌طور خودکار افزایش می‌یابد.
 </p>
 
 </main>
@@ -173,22 +222,22 @@ const $ = id => document.getElementById(id);
 
 let stopFlag = false;
 let running = false;
-let results = [];
+
+/* سه دسته ذخیره‌سازی */
+let resultsBalance  = [];   // با موجودی
+let resultsHistory  = [];   // با تاریخچه، بدون موجودی
+let resultsEmpty    = [];   // کاملاً خالی
 
 const MAX_LIMIT = 500;
 
 /* ============ تاخیر تطبیقی ============ */
 
-// ضریب افزایش در صورت خطا
 const BACKOFF_FACTOR  = 1.8;
-// حداکثر تاخیر مطلق (میلی‌ثانیه)
 const BACKOFF_MAX_MS  = 30000;
-// پس از چند موفقیت پیاپی، ضریب کاهش یابد
 const RECOVER_AFTER   = 5;
-// ضریب کاهش در هر بار recovery
 const RECOVER_FACTOR  = 0.85;
 
-let adaptiveDelayMs   = 0;   // افزایش انباشته به مقدار پایه
+let adaptiveDelayMs   = 0;
 let consecutiveOK     = 0;
 
 function getBaseDelayRange() {
@@ -238,9 +287,7 @@ function onRequestError(err) {
             const { mx } = getBaseDelayRange();
             adaptiveDelayMs = mx;
         } else {
-            adaptiveDelayMs = Math.floor(
-                adaptiveDelayMs * BACKOFF_FACTOR
-            );
+            adaptiveDelayMs = Math.floor(adaptiveDelayMs * BACKOFF_FACTOR);
         }
         if (adaptiveDelayMs > BACKOFF_MAX_MS) {
             adaptiveDelayMs = BACKOFF_MAX_MS;
@@ -248,326 +295,182 @@ function onRequestError(err) {
     }
 }
 
-/* ========================================= */
+/* ============ بارگذاری از localStorage ============ */
 
+function loadAll() {
+    try {
+        resultsBalance = JSON.parse(localStorage.getItem("wrs_balance") || "[]");
+    } catch { resultsBalance = []; }
 
-try {
-    results = JSON.parse(
-        localStorage.getItem("wrs_results") || "[]"
-    );
-} catch {
-    results = [];
+    try {
+        resultsHistory = JSON.parse(localStorage.getItem("wrs_history") || "[]");
+    } catch { resultsHistory = []; }
+
+    try {
+        resultsEmpty = JSON.parse(localStorage.getItem("wrs_empty") || "[]");
+    } catch { resultsEmpty = []; }
 }
+
+function saveAll() {
+    localStorage.setItem("wrs_balance", JSON.stringify(resultsBalance));
+    localStorage.setItem("wrs_history", JSON.stringify(resultsHistory));
+    localStorage.setItem("wrs_empty",   JSON.stringify(resultsEmpty));
+}
+
+loadAll();
 
 function status(text) {
     $("status").textContent = text;
 }
 
+/* ============ توابع کمکی رمزنگاری ============ */
+
 function concat(...arrays) {
     let length = arrays.reduce((n,a)=>n+a.length,0);
     let output = new Uint8Array(length);
     let offset = 0;
-
     for (const array of arrays) {
         output.set(array,offset);
         offset += array.length;
     }
-
     return output;
 }
 
 function hex(bytes) {
-    return [...bytes]
-        .map(x=>x.toString(16).padStart(2,"0"))
-        .join("");
+    return [...bytes].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 
-function hash160(data) {
-    return ripemd160(sha256(data));
-}
+function hash160(data) { return ripemd160(sha256(data)); }
 
 function base58(data) {
-
     const alphabet =
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
     let zeros = 0;
-
-    while (zeros < data.length && data[zeros] === 0) {
-        zeros++;
-    }
-
+    while (zeros < data.length && data[zeros] === 0) zeros++;
     let number = 0n;
-
-    for (const byte of data) {
-        number = number * 256n + BigInt(byte);
-    }
-
+    for (const byte of data) number = number * 256n + BigInt(byte);
     let output = "";
-
     while (number > 0n) {
         let remainder = Number(number % 58n);
         output = alphabet[remainder] + output;
         number /= 58n;
     }
-
     return "1".repeat(zeros) + output;
 }
 
 function checksum(data) {
-    return concat(
-        data,
-        sha256(sha256(data)).slice(0,4)
-    );
+    return concat(data, sha256(sha256(data)).slice(0,4));
 }
 
 function base58check(version,payload) {
-    return base58(
-        checksum(
-            concat(
-                new Uint8Array([version]),
-                payload
-            )
-        )
-    );
+    return base58(checksum(concat(new Uint8Array([version]), payload)));
 }
 
-
 /* Bitcoin Bech32 */
-
-const BECH32 =
-"qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 function polymod(values) {
-
     let c = 1;
-
     for (const value of values) {
-
         let top = c >>> 25;
-
         c = ((c & 0x1ffffff) << 5) ^ value;
-
         const generators = [
-            0x3b6a57b2,
-            0x26508e6d,
-            0x1ea119fa,
-            0x3d4233dd,
-            0x2a1462b3
+            0x3b6a57b2, 0x26508e6d, 0x1ea119fa,
+            0x3d4233dd, 0x2a1462b3
         ];
-
-        for (let i=0;i<5;i++) {
-            if ((top >>> i) & 1) {
-                c ^= generators[i];
-            }
-        }
+        for (let i=0;i<5;i++) if ((top >>> i) & 1) c ^= generators[i];
     }
-
     return c >>> 0;
 }
 
 function hrpExpand(hrp) {
-
-    let high = [];
-    let low = [];
-
+    let high = [], low = [];
     for (const char of hrp) {
         let value = char.charCodeAt(0);
         high.push(value >> 5);
         low.push(value & 31);
     }
-
     return [...high,0,...low];
 }
 
 function convertBits(data,from,to,pad) {
-
-    let accumulator = 0;
-    let bits = 0;
-    let output = [];
-
+    let accumulator = 0, bits = 0, output = [];
     const maxValue = (1 << to) - 1;
-
     for (const value of data) {
-
-        if (value < 0 || (value >> from)) {
-            throw Error("Invalid bit conversion");
-        }
-
+        if (value < 0 || (value >> from)) throw Error("Invalid bit conversion");
         accumulator = (accumulator << from) | value;
         bits += from;
-
         while (bits >= to) {
             bits -= to;
             output.push((accumulator >> bits) & maxValue);
         }
     }
-
     if (pad) {
-        if (bits) {
-            output.push((accumulator << (to-bits)) & maxValue);
-        }
-    } else if (
-        bits >= from ||
-        ((accumulator << (to-bits)) & maxValue)
-    ) {
+        if (bits) output.push((accumulator << (to-bits)) & maxValue);
+    } else if (bits >= from || ((accumulator << (to-bits)) & maxValue)) {
         throw Error("Invalid padding");
     }
-
     return output;
 }
 
 function bech32(hrp,version,program) {
-
-    const data = [
-        version,
-        ...convertBits(program,8,5,true)
-    ];
-
-    const values = [
-        ...hrpExpand(hrp),
-        ...data,
-        0,0,0,0,0,0
-    ];
-
+    const data = [version, ...convertBits(program,8,5,true)];
+    const values = [...hrpExpand(hrp), ...data, 0,0,0,0,0,0];
     const mod = polymod(values) ^ 1;
-
     let cs = [];
-
-    for (let i=0;i<6;i++) {
-        cs.push((mod >>> (5*(5-i))) & 31);
-    }
-
-    return hrp + "1" +
-        [...data,...cs]
-        .map(x=>BECH32[x])
-        .join("");
+    for (let i=0;i<6;i++) cs.push((mod >>> (5*(5-i))) & 31);
+    return hrp + "1" + [...data,...cs].map(x=>BECH32[x]).join("");
 }
 
-
-/* Derivation */
+/* ============ مشتق‌سازی ============ */
 
 function getPublicKey(seed,path,compressed=true) {
-
     const root = HDKey.fromMasterSeed(seed);
     const node = root.derive(path);
-
-    return secp256k1.getPublicKey(
-        node.privateKey,
-        compressed
-    );
+    return secp256k1.getPublicKey(node.privateKey, compressed);
 }
 
-
-/* Bitcoin */
-
 function bitcoinAddresses(seed) {
-
-    const legacyPub = getPublicKey(
-        seed,
-        "m/44'/0'/0'/0/0"
-    );
-
-    const nestedPub = getPublicKey(
-        seed,
-        "m/49'/0'/0'/0/0"
-    );
-
-    const nativePub = getPublicKey(
-        seed,
-        "m/84'/0'/0'/0/0"
-    );
-
+    const legacyPub = getPublicKey(seed, "m/44'/0'/0'/0/0");
+    const nestedPub = getPublicKey(seed, "m/49'/0'/0'/0/0");
+    const nativePub = getPublicKey(seed, "m/84'/0'/0'/0/0");
     return {
-
-        BTC_Legacy:
-        base58check(0,hash160(legacyPub)),
-
-        BTC_NestedSegWit:
-        base58check(
-            5,
-            hash160(
-                concat(
-                    new Uint8Array([0,20]),
-                    hash160(nestedPub)
-                )
-            )
-        ),
-
-        BTC_NativeSegWit:
-        bech32("bc",0,hash160(nativePub))
-
+        BTC_Legacy: base58check(0,hash160(legacyPub)),
+        BTC_NestedSegWit: base58check(5,
+            hash160(concat(new Uint8Array([0,20]), hash160(nestedPub)))),
+        BTC_NativeSegWit: bech32("bc",0,hash160(nativePub))
     };
 }
 
-
-/* Ethereum and BNB */
-
 function evmAddress(seed) {
-
-    const publicKey = getPublicKey(
-        seed,
-        "m/44'/60'/0'/0/0",
-        false
-    );
-
+    const publicKey = getPublicKey(seed, "m/44'/60'/0'/0/0", false);
     const hash = keccak_256(publicKey.slice(1));
-
     return "0x" + hex(hash.slice(-20));
 }
 
-
-/* TRON */
-
 function tronAddress(seed) {
-
-    const publicKey = getPublicKey(
-        seed,
-        "m/44'/195'/0'/0/0",
-        false
-    );
-
+    const publicKey = getPublicKey(seed, "m/44'/195'/0'/0/0", false);
     const hash = keccak_256(publicKey.slice(1));
-
-    const payload = concat(
-        new Uint8Array([0x41]),
-        hash.slice(-20)
-    );
-
+    const payload = concat(new Uint8Array([0x41]), hash.slice(-20));
     return base58(checksum(payload));
 }
 
-
-/* HMAC-SHA512 */
-
 async function hmacSHA512(key, message) {
     const cryptoKey = await crypto.subtle.importKey(
-        "raw",
-        key,
-        { name: "HMAC", hash: "SHA-512" },
-        false,
-        ["sign"]
+        "raw", key, { name: "HMAC", hash: "SHA-512" }, false, ["sign"]
     );
     const sig = await crypto.subtle.sign("HMAC", cryptoKey, message);
     return new Uint8Array(sig);
 }
 
-
-/* Solana (Ed25519 / SLIP-0010) — async */
-
 async function solanaAddress(seed) {
-
     const path = [44, 501, 0, 0];
     const HARDENED = 0x80000000;
-
     let I = await hmacSHA512(
-        new TextEncoder().encode("ed25519 seed"),
-        seed
+        new TextEncoder().encode("ed25519 seed"), seed
     );
-
     let key = I.slice(0, 32);
     let chain = I.slice(32, 64);
-
     for (const index of path) {
         const idx = (index | HARDENED) >>> 0;
         const data = new Uint8Array(37);
@@ -577,372 +480,392 @@ async function solanaAddress(seed) {
         data[34] = (idx >>> 16) & 0xff;
         data[35] = (idx >>> 8) & 0xff;
         data[36] = idx & 0xff;
-
         const out = await hmacSHA512(chain, data);
         key = out.slice(0, 32);
         chain = out.slice(32, 64);
     }
-
-    const pub = ed25519.getPublicKey(key);
-
-    return base58Sol.encode(pub);
+    return base58Sol.encode(ed25519.getPublicKey(key));
 }
 
-
-/* Network APIs */
+/* ============ شبکه ============ */
 
 async function fetchJSON(url,options={}) {
-
     const controller = new AbortController();
-
-    const timeout = setTimeout(
-        ()=>controller.abort(),
-        20000
-    );
-
+    const timeout = setTimeout(()=>controller.abort(), 20000);
     try {
-
         const response = await fetch(url,{
             ...options,
             signal:controller.signal
         });
-
-        if (!response.ok) {
-            throw Error("HTTP "+response.status);
-        }
-
+        if (!response.ok) throw Error("HTTP "+response.status);
         return await response.json();
-
     } finally {
         clearTimeout(timeout);
     }
 }
 
-
-/* BTC */
-
-async function checkBTC(address) {
-
-    const data = await fetchJSON(
-        "https://blockstream.info/api/address/"+
-        encodeURIComponent(address)
-    );
-
-    const confirmed =
-        data.chain_stats.funded_txo_sum -
-        data.chain_stats.spent_txo_sum;
-
-    const unconfirmed =
-        data.mempool_stats.funded_txo_sum -
-        data.mempool_stats.spent_txo_sum;
-
-    return {
-
-        balance_satoshis:confirmed+unconfirmed,
-
-        balance_BTC:
-        (confirmed+unconfirmed)/100000000,
-
-        transaction_count:
-        data.chain_stats.tx_count+
-        data.mempool_stats.tx_count
-
-    };
-}
-
-
-/* ETH / BNB RPC */
-
 async function rpc(url,method,params) {
-
     const data = await fetchJSON(url,{
         method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            jsonrpc:"2.0",
-            id:1,
-            method,
-            params
-        })
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ jsonrpc:"2.0", id:1, method, params })
     });
-
-    if (data.error) {
-        throw Error(data.error.message || "RPC error");
-    }
-
+    if (data.error) throw Error(data.error.message || "RPC error");
     return data.result;
 }
 
-async function checkEVM(url,address) {
-
-    const balance = await rpc(
-        url,
-        "eth_getBalance",
-        [address,"latest"]
+/* --- BTC: موجودی + تعداد تراکنش --- */
+async function checkBTC(address) {
+    const data = await fetchJSON(
+        "https://blockstream.info/api/address/" + encodeURIComponent(address)
     );
-
+    const confirmed = data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum;
+    const unconfirmed = data.mempool_stats.funded_txo_sum - data.mempool_stats.spent_txo_sum;
+    const txCount = data.chain_stats.tx_count + data.mempool_stats.tx_count;
     return {
-        balance_wei:BigInt(balance).toString()
+        balance_satoshis: confirmed + unconfirmed,
+        balance_BTC: (confirmed + unconfirmed) / 100000000,
+        transaction_count: txCount
     };
 }
 
+/* --- ETH/BNB: موجودی + nonce (تعداد تراکنش خروجی) --- */
+async function checkEVM(url,address) {
+    const [balanceHex, nonceHex] = await Promise.all([
+        rpc(url, "eth_getBalance", [address, "latest"]),
+        rpc(url, "eth_getTransactionCount", [address, "latest"])
+    ]);
+    return {
+        balance_wei: BigInt(balanceHex).toString(),
+        transaction_count: Number(BigInt(nonceHex))
+    };
+}
 
-/* ERC20 / BEP20 balanceOf */
-
+/* --- ERC20/BEP20 balanceOf --- */
 function makeBalanceOfData(address) {
-
-    return "0x70a08231" +
-        address.slice(2).toLowerCase().padStart(64,"0");
+    return "0x70a08231" + address.slice(2).toLowerCase().padStart(64,"0");
 }
 
 async function checkToken_EVM(url,address,contract,decimals) {
-
-    const data = await rpc(
-        url,
-        "eth_call",
-        [
-            {
-                to:contract,
-                data:makeBalanceOfData(address)
-            },
-            "latest"
-        ]
-    );
-
+    const data = await rpc(url, "eth_call", [
+        { to:contract, data:makeBalanceOfData(address) },
+        "latest"
+    ]);
     const raw = BigInt(data || "0x0");
-
     return {
-        raw:raw.toString(),
-        balance:Number(raw)/Math.pow(10,decimals),
-        decimals:decimals
+        raw: raw.toString(),
+        balance: Number(raw) / Math.pow(10,decimals),
+        decimals: decimals
     };
 }
 
-
-/* TRON account and TRC20 tokens */
-
-const USDT_TRON_CONTRACT =
-"TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+/* --- TRON: موجودی + تعداد تراکنش --- */
+const USDT_TRON_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
 async function checkTRON(address) {
-
+    // اطلاعات اکانت (موجودی + توکن‌ها)
     const account = await fetchJSON(
-        "https://api.trongrid.io/v1/accounts/"+
-        encodeURIComponent(address)
+        "https://api.trongrid.io/v1/accounts/" + encodeURIComponent(address)
     );
+    const data = account.data && account.data.length ? account.data[0] : null;
 
-    const data =
-        account.data && account.data.length
-        ? account.data[0]
-        : null;
+    // تعداد تراکنش‌ها
+    let txCount = 0;
+    try {
+        const txResp = await fetchJSON(
+            "https://api.trongrid.io/v1/accounts/" +
+            encodeURIComponent(address) + "/transactions?limit=1"
+        );
+        if (txResp && typeof txResp.total === "number") {
+            txCount = txResp.total;
+        } else if (txResp && Array.isArray(txResp.data)) {
+            txCount = txResp.data.length;
+        }
+    } catch {}
 
     return {
-        balance_sun:data ? data.balance : 0,
-        balance_TRX:data ? data.balance/1000000 : 0,
-        tokens:data && Array.isArray(data.trc20)
-            ? data.trc20
-            : []
+        balance_sun: data ? data.balance : 0,
+        balance_TRX: data ? data.balance/1000000 : 0,
+        tokens: data && Array.isArray(data.trc20) ? data.trc20 : [],
+        transaction_count: txCount
     };
 }
 
 function checkTRON_USDT(tronData) {
-
     const tokenList = tronData.tokens || [];
-
     for (const token of tokenList) {
-
-        const balance =
-            token[USDT_TRON_CONTRACT];
-
+        const balance = token[USDT_TRON_CONTRACT];
         if (balance !== undefined) {
-
             const raw = BigInt(balance);
-
-            return {
-                raw:raw.toString(),
-                balance:Number(raw)/1000000
-            };
+            return { raw: raw.toString(), balance: Number(raw)/1000000 };
         }
     }
-
-    return {
-        raw:"0",
-        balance:0
-    };
+    return { raw:"0", balance:0 };
 }
 
-
-/* Solana RPC */
-
-const SOLANA_RPC =
-"https://api.mainnet-beta.solana.com";
+/* --- Solana: موجودی + تعداد تراکنش --- */
+const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
+const USDC_SOL_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 async function solanaRPC(method, params) {
-
-    const data = await fetchJSON(SOLANA_RPC,{
+    const data = await fetchJSON(SOLANA_RPC, {
         method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            jsonrpc:"2.0",
-            id:1,
-            method,
-            params
-        })
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ jsonrpc:"2.0", id:1, method, params })
     });
-
-    if (data.error) {
-        throw Error(data.error.message || "RPC error");
-    }
-
+    if (data.error) throw Error(data.error.message || "RPC error");
     return data.result;
 }
 
 async function checkSOL(address) {
+    const [balanceRes, sigRes] = await Promise.all([
+        solanaRPC("getBalance", [address, { commitment:"confirmed" }]),
+        solanaRPC("getSignaturesForAddress",
+            [address, { limit: 1000 }]).catch(() => [])
+    ]);
 
-    const result = await solanaRPC(
-        "getBalance",
-        [address,{ commitment:"confirmed" }]
-    );
-
-    const lamports = result && result.value ? result.value : 0;
+    const lamports = balanceRes && balanceRes.value ? balanceRes.value : 0;
+    const txCount = Array.isArray(sigRes) ? sigRes.length : 0;
 
     return {
         balance_lamports: String(lamports),
-        balance_SOL: Number(lamports) / 1e9
+        balance_SOL: Number(lamports) / 1e9,
+        transaction_count: txCount
     };
 }
 
-const USDC_SOL_MINT =
-"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-
 async function checkUSDC_SOL(ownerAddress) {
-
-    const accounts = await solanaRPC(
-        "getTokenAccountsByOwner",
-        [
-            ownerAddress,
-            { mint: USDC_SOL_MINT },
-            { encoding: "jsonParsed" }
-        ]
-    );
-
+    const accounts = await solanaRPC("getTokenAccountsByOwner", [
+        ownerAddress,
+        { mint: USDC_SOL_MINT },
+        { encoding: "jsonParsed" }
+    ]);
     let totalRaw = 0n;
-
     if (accounts && Array.isArray(accounts.value)) {
         for (const acc of accounts.value) {
             try {
-                const amountStr =
-                    acc.account.data.parsed.info
-                        .tokenAmount.amount;
+                const amountStr = acc.account.data.parsed.info.tokenAmount.amount;
                 totalRaw += BigInt(amountStr);
             } catch {}
         }
     }
-
-    return {
-        raw: totalRaw.toString(),
-        balance: Number(totalRaw) / 1e6
-    };
+    return { raw: totalRaw.toString(), balance: Number(totalRaw) / 1e6 };
 }
 
+/* ============ طبقه‌بندی ولت ============ */
 
-/* Positive assets only */
+function classifyWallet(result) {
+    let hasBalance = false;
+    let hasHistory = false;
 
-function getPositiveAssets(result) {
-
-    const positive = {};
-
-    for (const [network,data] of Object.entries(result.checks)) {
-
+    for (const [network, data] of Object.entries(result.checks)) {
         if (!data || data.error) continue;
 
         if (network.startsWith("BTC_")) {
-
-            const balance = Number(
-                data.balance_satoshis || 0
-            );
-
-            if (balance > 0) {
-
-                positive[network] = {
-                    address:result.addresses[network],
-                    balance_BTC:data.balance_BTC
-                };
-            }
+            if (Number(data.balance_satoshis || 0) > 0) hasBalance = true;
+            if (Number(data.transaction_count || 0) > 0) hasHistory = true;
         }
-
         if (network === "ETH" || network === "BNB") {
-
-            const balance = BigInt(
-                data.balance_wei || "0"
-            );
-
-            if (balance > 0n) {
-
-                positive[network] = {
-                    address:result.addresses[network],
-                    balance_native:
-                    Number(balance)/1e18
-                };
-            }
+            if (BigInt(data.balance_wei || "0") > 0n) hasBalance = true;
+            if (Number(data.transaction_count || 0) > 0) hasHistory = true;
         }
-
         if (network === "TRON") {
-
-            const balance = Number(
-                data.balance_sun || 0
-            );
-
-            if (balance > 0) {
-
-                positive[network] = {
-                    address:result.addresses[network],
-                    balance_TRX:data.balance_TRX
-                };
-            }
+            if (Number(data.balance_sun || 0) > 0) hasBalance = true;
+            if (Number(data.transaction_count || 0) > 0) hasHistory = true;
         }
-
         if (network === "SOL") {
+            if (Number(data.balance_lamports || 0) > 0) hasBalance = true;
+            if (Number(data.transaction_count || 0) > 0) hasHistory = true;
+        }
+        if (network.startsWith("USDT_") || network.startsWith("USDC_")) {
+            if (Number(data.balance || 0) > 0) hasBalance = true;
+        }
+    }
 
-            const balance = Number(
-                data.balance_lamports || 0
-            );
+    if (hasBalance) return "balance";
+    if (hasHistory) return "history";
+    return "empty";
+}
 
+/* ============ نمایش ============ */
+
+function renderCard(item, kind) {
+    const box = document.createElement("div");
+    box.className = "result " +
+        (kind === "balance" ? "with-balance" :
+         kind === "history" ? "with-history" : "empty");
+
+    const title = document.createElement("h3");
+    title.textContent =
+        kind === "balance" ? "🟢 ولت با موجودی" :
+        kind === "history" ? "🔵 ولت با تاریخچه (بدون موجودی)" :
+                             "⚪ ولت خالی";
+    box.appendChild(title);
+
+    const word = document.createElement("p");
+    word.textContent = "کلمه گمشده: " + item.missing_word;
+    box.appendChild(word);
+
+    const position = document.createElement("p");
+    position.textContent = "جایگاه کلمه: " + item.missing_position;
+    box.appendChild(position);
+
+    for (const [network, asset] of Object.entries(item.assets || {})) {
+        const section = document.createElement("div");
+        section.style.borderTop = "1px solid #ddd";
+        section.style.paddingTop = "8px";
+        section.style.marginTop = "6px";
+
+        const name = document.createElement("h4");
+        name.textContent = network;
+        section.appendChild(name);
+
+        const address = document.createElement("p");
+        address.textContent = "آدرس: " + asset.address;
+        section.appendChild(address);
+
+        if (asset.balance_BTC !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "موجودی BTC: " + asset.balance_BTC;
+            section.appendChild(b);
+        }
+        if (asset.balance_native !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "موجودی: " + asset.balance_native;
+            section.appendChild(b);
+        }
+        if (asset.balance_TRX !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "موجودی TRX: " + asset.balance_TRX;
+            section.appendChild(b);
+        }
+        if (asset.balance_SOL !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "موجودی SOL: " + asset.balance_SOL;
+            section.appendChild(b);
+        }
+        if (asset.balance_USDT !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "موجودی USDT: " + asset.balance_USDT;
+            section.appendChild(b);
+        }
+        if (asset.balance_USDC !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "موجودی USDC: " + asset.balance_USDC;
+            section.appendChild(b);
+        }
+        if (asset.transaction_count !== undefined) {
+            const b = document.createElement("p");
+            b.textContent = "تعداد تراکنش: " + asset.transaction_count;
+            section.appendChild(b);
+        }
+
+        box.appendChild(section);
+    }
+
+    return box;
+}
+
+function render() {
+    // بخش ۱
+    $("resultsBalance").innerHTML = "";
+    $("countBalance").textContent = resultsBalance.length;
+    for (const item of resultsBalance.slice().reverse()) {
+        $("resultsBalance").appendChild(renderCard(item, "balance"));
+    }
+
+    // بخش ۲
+    $("resultsHistory").innerHTML = "";
+    $("countHistory").textContent = resultsHistory.length;
+    for (const item of resultsHistory.slice().reverse()) {
+        $("resultsHistory").appendChild(renderCard(item, "history"));
+    }
+
+    // بخش ۳
+    $("resultsEmpty").innerHTML = "";
+    $("countEmpty").textContent = resultsEmpty.length;
+    for (const item of resultsEmpty.slice().reverse()) {
+        $("resultsEmpty").appendChild(renderCard(item, "empty"));
+    }
+}
+
+/* ============ Cursor ============ */
+
+function getCursor() {
+    try {
+        return JSON.parse(
+            localStorage.getItem("wrs_cursor") ||
+            '{"position":0,"index":0,"valid":0}'
+        );
+    } catch {
+        return { position:0, index:0, valid:0 };
+    }
+}
+
+function saveCursor(cursor) {
+    localStorage.setItem("wrs_cursor", JSON.stringify(cursor));
+}
+
+/* ============ استخراج دارایی‌های مثبت ============ */
+
+function getPositiveAssets(result) {
+    const positive = {};
+
+    for (const [network, data] of Object.entries(result.checks)) {
+        if (!data || data.error) continue;
+
+        if (network.startsWith("BTC_")) {
+            const balance = Number(data.balance_satoshis || 0);
             if (balance > 0) {
-
                 positive[network] = {
-                    address:result.addresses[network],
-                    balance_SOL:data.balance_SOL
+                    address: result.addresses[network],
+                    balance_BTC: data.balance_BTC,
+                    transaction_count: data.transaction_count
                 };
             }
         }
-
-        if (network.startsWith("USDT_") || network.startsWith("USDC_")) {
-
-            const balance = Number(data.balance || 0);
-
+        if (network === "ETH" || network === "BNB") {
+            const balance = BigInt(data.balance_wei || "0");
+            if (balance > 0n) {
+                positive[network] = {
+                    address: result.addresses[network],
+                    balance_native: Number(balance)/1e18,
+                    transaction_count: data.transaction_count
+                };
+            }
+        }
+        if (network === "TRON") {
+            const balance = Number(data.balance_sun || 0);
             if (balance > 0) {
-
+                positive[network] = {
+                    address: result.addresses[network],
+                    balance_TRX: data.balance_TRX,
+                    transaction_count: data.transaction_count
+                };
+            }
+        }
+        if (network === "SOL") {
+            const balance = Number(data.balance_lamports || 0);
+            if (balance > 0) {
+                positive[network] = {
+                    address: result.addresses[network],
+                    balance_SOL: data.balance_SOL,
+                    transaction_count: data.transaction_count
+                };
+            }
+        }
+        if (network.startsWith("USDT_") || network.startsWith("USDC_")) {
+            const balance = Number(data.balance || 0);
+            if (balance > 0) {
                 let addrKey = "ETH";
-
                 if (network === "USDT_TRC20") addrKey = "TRON";
                 else if (network === "USDT_BEP20" ||
                          network === "USDC_BEP20") addrKey = "BNB";
                 else if (network === "USDC_SOL") addrKey = "SOL";
 
-                const entry = {
-                    address: result.addresses[addrKey]
-                };
-
-                if (network.startsWith("USDT_")) {
-                    entry.balance_USDT = balance;
-                } else {
-                    entry.balance_USDC = balance;
-                }
+                const entry = { address: result.addresses[addrKey] };
+                if (network.startsWith("USDT_")) entry.balance_USDT = balance;
+                else entry.balance_USDC = balance;
 
                 positive[network] = entry;
             }
@@ -952,152 +875,57 @@ function getPositiveAssets(result) {
     return positive;
 }
 
+/* ============ تاریخچه تراکنش‌ها (برای ولت خالی) ============ */
 
-/* Save and resume */
+function getHistoryInfo(result) {
+    // برای ولت‌هایی که موجودی صفر دارند اما تراکنش داشتند
+    const info = {};
 
-function getCursor() {
+    for (const [network, data] of Object.entries(result.checks)) {
+        if (!data || data.error) continue;
 
-    try {
-        return JSON.parse(
-            localStorage.getItem("wrs_cursor") ||
-            '{"position":0,"index":0,"valid":0}'
-        );
-    } catch {
-        return {
-            position:0,
-            index:0,
-            valid:0
-        };
-    }
-}
-
-function saveCursor(cursor) {
-
-    localStorage.setItem(
-        "wrs_cursor",
-        JSON.stringify(cursor)
-    );
-}
-
-function saveResults() {
-
-    localStorage.setItem(
-        "wrs_results",
-        JSON.stringify(results)
-    );
-}
-
-
-/* Display positive results */
-
-function render() {
-
-    $("results").innerHTML = "";
-
-    for (const item of results.slice().reverse()) {
-
-        const box = document.createElement("div");
-        box.className = "result";
-
-        const title = document.createElement("h3");
-        title.textContent = "دارایی پیدا شد";
-
-        const word = document.createElement("p");
-        word.textContent =
-            "کلمه گمشده: " + item.missing_word;
-
-        const position = document.createElement("p");
-        position.textContent =
-            "جایگاه کلمه: " + item.missing_position;
-
-        box.appendChild(title);
-        box.appendChild(word);
-        box.appendChild(position);
-
-        for (
-            const [network,asset]
-            of Object.entries(item.assets)
-        ) {
-
-            const section = document.createElement("div");
-
-            section.style.borderTop = "1px solid #ddd";
-            section.style.paddingTop = "8px";
-
-            const name = document.createElement("h4");
-            name.textContent = network;
-
-            const address = document.createElement("p");
-            address.textContent = "آدرس: " + asset.address;
-
-            const balance = document.createElement("p");
-
-            if (network.startsWith("BTC_")) {
-                balance.textContent =
-                    "موجودی BTC: " + asset.balance_BTC;
-            }
-
-            if (network === "ETH") {
-                balance.textContent =
-                    "موجودی ETH: " + asset.balance_native;
-            }
-
-            if (network === "BNB") {
-                balance.textContent =
-                    "موجودی BNB: " + asset.balance_native;
-            }
-
-            if (network === "TRON") {
-                balance.textContent =
-                    "موجودی TRX: " + asset.balance_TRX;
-            }
-
-            if (network === "SOL") {
-                balance.textContent =
-                    "موجودی SOL: " + asset.balance_SOL;
-            }
-
-            if (network.startsWith("USDT_")) {
-                balance.textContent =
-                    "موجودی USDT: " + asset.balance_USDT;
-            }
-
-            if (network.startsWith("USDC_")) {
-                balance.textContent =
-                    "موجودی USDC: " + asset.balance_USDC;
-            }
-
-            section.appendChild(name);
-            section.appendChild(address);
-            section.appendChild(balance);
-
-            box.appendChild(section);
+        if (network.startsWith("BTC_") && Number(data.transaction_count || 0) > 0) {
+            info[network] = {
+                address: result.addresses[network],
+                transaction_count: data.transaction_count
+            };
         }
-
-        $("results").appendChild(box);
+        if ((network === "ETH" || network === "BNB") &&
+            Number(data.transaction_count || 0) > 0) {
+            info[network] = {
+                address: result.addresses[network],
+                transaction_count: data.transaction_count
+            };
+        }
+        if (network === "TRON" && Number(data.transaction_count || 0) > 0) {
+            info[network] = {
+                address: result.addresses[network],
+                transaction_count: data.transaction_count
+            };
+        }
+        if (network === "SOL" && Number(data.transaction_count || 0) > 0) {
+            info[network] = {
+                address: result.addresses[network],
+                transaction_count: data.transaction_count
+            };
+        }
     }
+
+    return info;
 }
 
-
-/* Scanner */
+/* ============ اسکنر اصلی ============ */
 
 async function scan() {
-
     if (running) return;
-
     running = true;
     stopFlag = false;
 
-    // reset adaptive delay at start of each run
     adaptiveDelayMs = 0;
     consecutiveOK = 0;
 
-    const words = $("words")
-        .value
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
+    const words = $("words").value.trim().toLowerCase()
+        .split(/\s+/).filter(Boolean);
 
     if (words.length !== 11) {
         status("خطا: دقیقاً ۱۱ کلمه وارد کن.");
@@ -1105,54 +933,31 @@ async function scan() {
         return;
     }
 
-    if (words.some(word=>!wordlist.includes(word))) {
+    if (words.some(word => !wordlist.includes(word))) {
         status("خطا: یک یا چند کلمه در فهرست BIP39 نیست.");
         running = false;
         return;
     }
 
     let cursor = getCursor();
-
-    const limit = Math.max(
-        1,
-        Math.min(MAX_LIMIT, Number($("limit").value)||5)
-    );
-
+    const limit = Math.max(1, Math.min(MAX_LIMIT, Number($("limit").value) || 5));
     let checked = 0;
 
     status("اسکن شروع شد...");
 
     try {
-
-        while (
-            cursor.position < 12 &&
-            checked < limit &&
-            !stopFlag
-        ) {
-
+        while (cursor.position < 12 && checked < limit && !stopFlag) {
             if (cursor.index >= 2048) {
-
                 cursor.position++;
                 cursor.index = 0;
-
                 saveCursor(cursor);
                 continue;
             }
 
             const candidate = words.slice();
+            candidate.splice(cursor.position, 0, wordlist[cursor.index]);
 
-            candidate.splice(
-                cursor.position,
-                0,
-                wordlist[cursor.index]
-            );
-
-            if (
-                !validateMnemonic(
-                    candidate.join(" "),
-                    wordlist
-                )
-            ) {
+            if (!validateMnemonic(candidate.join(" "), wordlist)) {
                 cursor.index++;
                 saveCursor(cursor);
                 continue;
@@ -1162,21 +967,17 @@ async function scan() {
             checked++;
 
             const { mn, mx } = currentDelayRange();
-
             status(
-                "عبارت معتبر شماره: "+cursor.valid+
-                "\nجایگاه در حال بررسی: "+(cursor.position+1)+
-                "\nبررسی موازی شبکه‌ها با تاخیر "+
-                mn+"–"+mx+" ms"+
+                "عبارت معتبر شماره: " + cursor.valid +
+                "\nجایگاه در حال بررسی: " + (cursor.position+1) +
+                "\nتاخیر فعلی: " + mn + "–" + mx + " ms" +
                 (adaptiveDelayMs > 0
-                    ? "\n⚠ افزایش تاخیر خودکار: +"+
-                      adaptiveDelayMs+" ms"
+                    ? "\n⚠ افزایش تاخیر: +" + adaptiveDelayMs + " ms"
                     : "")
             );
 
             const mnemonic = candidate.join(" ");
             const seed = mnemonicToSeedSync(mnemonic);
-
             const solAddr = await solanaAddress(seed);
 
             const addresses = {
@@ -1189,19 +990,12 @@ async function scan() {
 
             const ETH_RPC = "https://ethereum-rpc.publicnode.com";
             const BSC_RPC = "https://bsc-rpc.publicnode.com";
-
             const USDT_ERC20 = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
             const USDC_ERC20 = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
             const USDT_BEP20 = "0x55d398326f99059fF775485246999027B3197955";
             const USDC_BEP20 = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 
             const checks = {};
-
-            /* ---------------------------------------------------
-               هر تسک قبل از اجرا، تاخیر تصادفی را می‌گیرد
-               و پس از اجرا نتیجه را در checks می‌نویسد.
-               خطاها باعث افزایش خودکار تاخیر می‌شوند.
-            --------------------------------------------------- */
 
             const wrap = (name, fn) => {
                 return (async () => {
@@ -1215,135 +1009,104 @@ async function scan() {
                         checks[name] = v;
                         onRequestSuccess();
                     } catch (e) {
-                        checks[name] = {
-                            error: String(e && (e.message || e))
-                        };
+                        checks[name] = { error: String(e && (e.message || e)) };
                         onRequestError(e);
                     }
                 })();
             };
 
             const tasks = [];
-
-            tasks.push(wrap("BTC_Legacy",
-                () => checkBTC(addresses.BTC_Legacy)));
-
-            tasks.push(wrap("BTC_NestedSegWit",
-                () => checkBTC(addresses.BTC_NestedSegWit)));
-
-            tasks.push(wrap("BTC_NativeSegWit",
-                () => checkBTC(addresses.BTC_NativeSegWit)));
-
-            tasks.push(wrap("ETH",
-                () => checkEVM(ETH_RPC, addresses.ETH)));
-
-            tasks.push(wrap("USDT_ERC20",
-                () => checkToken_EVM(
-                    ETH_RPC, addresses.ETH, USDT_ERC20, 6
-                )));
-
-            tasks.push(wrap("USDC_ERC20",
-                () => checkToken_EVM(
-                    ETH_RPC, addresses.ETH, USDC_ERC20, 6
-                )));
-
-            tasks.push(wrap("BNB",
-                () => checkEVM(BSC_RPC, addresses.BNB)));
-
-            tasks.push(wrap("USDT_BEP20",
-                () => checkToken_EVM(
-                    BSC_RPC, addresses.BNB, USDT_BEP20, 18
-                )));
-
-            tasks.push(wrap("USDC_BEP20",
-                () => checkToken_EVM(
-                    BSC_RPC, addresses.BNB, USDC_BEP20, 18
-                )));
-
-            tasks.push(wrap("TRON",
-                () => checkTRON(addresses.TRON)));
-
-            tasks.push(wrap("SOL",
-                () => checkSOL(addresses.SOL)));
-
-            tasks.push(wrap("USDC_SOL",
-                () => checkUSDC_SOL(addresses.SOL)));
+            tasks.push(wrap("BTC_Legacy",      () => checkBTC(addresses.BTC_Legacy)));
+            tasks.push(wrap("BTC_NestedSegWit", () => checkBTC(addresses.BTC_NestedSegWit)));
+            tasks.push(wrap("BTC_NativeSegWit", () => checkBTC(addresses.BTC_NativeSegWit)));
+            tasks.push(wrap("ETH",  () => checkEVM(ETH_RPC, addresses.ETH)));
+            tasks.push(wrap("USDT_ERC20", () => checkToken_EVM(ETH_RPC, addresses.ETH, USDT_ERC20, 6)));
+            tasks.push(wrap("USDC_ERC20", () => checkToken_EVM(ETH_RPC, addresses.ETH, USDC_ERC20, 6)));
+            tasks.push(wrap("BNB",  () => checkEVM(BSC_RPC, addresses.BNB)));
+            tasks.push(wrap("USDT_BEP20", () => checkToken_EVM(BSC_RPC, addresses.BNB, USDT_BEP20, 18)));
+            tasks.push(wrap("USDC_BEP20", () => checkToken_EVM(BSC_RPC, addresses.BNB, USDC_BEP20, 18)));
+            tasks.push(wrap("TRON", () => checkTRON(addresses.TRON)));
+            tasks.push(wrap("SOL",  () => checkSOL(addresses.SOL)));
+            tasks.push(wrap("USDC_SOL", () => checkUSDC_SOL(addresses.SOL)));
 
             await Promise.all(tasks);
 
-            /* USDT TRC20 از نتیجه TRON استخراج می‌شود */
             if (checks.TRON && !checks.TRON.error) {
                 checks.USDT_TRC20 = checkTRON_USDT(checks.TRON);
             } else {
                 checks.USDT_TRC20 = {
-                    error: checks.TRON
-                        ? checks.TRON.error
-                        : "TRON check failed"
+                    error: checks.TRON ? checks.TRON.error : "TRON check failed"
                 };
             }
 
             const result = { addresses, checks };
+            const kind = classifyWallet(result);
 
-            const assets = getPositiveAssets(result);
+            const record = {
+                missing_word: candidate[cursor.position],
+                missing_position: cursor.position + 1,
+                addresses: addresses,
+                assets: {},
+                found_at: new Date().toISOString()
+            };
 
-            if (Object.keys(assets).length > 0) {
+            if (kind === "balance") {
+                record.assets = getPositiveAssets(result);
+                resultsBalance.push(record);
+            } else if (kind === "history") {
+                record.assets = getHistoryInfo(result);
+                resultsHistory.push(record);
+            } else {
+                // ولت خالی: فقط آدرس‌ها را ذخیره کن
+                record.assets = {};
+                resultsEmpty.push(record);
+            }
 
-                const found = {
-                    missing_word: candidate[cursor.position],
-                    missing_position: cursor.position+1,
-                    assets: assets,
-                    found_at: new Date().toISOString()
-                };
+            saveAll();
+            render();
 
-                results.push(found);
-                saveResults();
-                render();
-
+            if (kind === "balance") {
                 status(
-                    "دارایی پیدا شد!\n"+
-                    "کلمه گمشده: "+found.missing_word+
-                    "\nجایگاه کلمه: "+found.missing_position
+                    "🟢 دارایی پیدا شد!\n" +
+                    "کلمه: " + record.missing_word +
+                    "\nجایگاه: " + record.missing_position
+                );
+            } else if (kind === "history") {
+                status(
+                    "🔵 ولت با تاریخچه پیدا شد (بدون موجودی)\n" +
+                    "کلمه: " + record.missing_word +
+                    "\nجایگاه: " + record.missing_position
                 );
             }
 
             cursor.index++;
             saveCursor(cursor);
-
             candidate.fill("");
         }
 
         if (cursor.position >= 12) {
-
             status("بررسی تمام جایگاه‌ها پایان یافت.");
-
         } else if (stopFlag) {
-
             status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
-
         } else {
-
             status(
-                "این نوبت تمام شد.\n"+
-                checked+
-                " عبارت معتبر بررسی شد.\n"+
+                "این نوبت تمام شد.\n" +
+                checked + " عبارت معتبر بررسی شد.\n" +
                 "برای ادامه دوباره شروع را بزن."
             );
         }
 
-    } catch(error) {
-
+    } catch (error) {
         status(
-            "خطا: "+String(error.message||error)+
+            "خطا: " + String(error.message || error) +
             "\nپیشرفت ذخیره شده است."
         );
-
     } finally {
         running = false;
     }
 }
 
-
-/* Buttons */
+/* ============ دکمه‌ها ============ */
 
 $("start").onclick = scan;
 
@@ -1353,88 +1116,78 @@ $("stop").onclick = () => {
 };
 
 $("clear").onclick = () => {
-
     if (running) {
         alert("ابتدا اسکن را متوقف کن.");
         return;
     }
-
-    if (confirm("پیشرفت و گزارش‌ها پاک شود؟")) {
-
+    if (confirm("همه پیشرفت و گزارش‌ها پاک شود؟")) {
         localStorage.removeItem("wrs_cursor");
-        localStorage.removeItem("wrs_results");
-
-        results = [];
-
+        localStorage.removeItem("wrs_balance");
+        localStorage.removeItem("wrs_history");
+        localStorage.removeItem("wrs_empty");
+        resultsBalance = [];
+        resultsHistory = [];
+        resultsEmpty = [];
         render();
-
         status("پیشرفت پاک شد.");
     }
 };
 
-
-/* CSV */
+/* ============ CSV ============ */
 
 $("csv").onclick = () => {
-
     const rows = [
-        ["Missing Word","Position","Network","Address","Balance"]
+        ["Category","Missing Word","Position","Network","Address","Balance","TxCount"]
     ];
 
-    for (const item of results) {
-
-        for (const [network,asset] of Object.entries(item.assets)) {
-
-            let balance = "";
-
-            if (network.startsWith("BTC_")) {
-                balance = asset.balance_BTC;
-            } else if (network === "ETH") {
-                balance = asset.balance_native;
-            } else if (network === "BNB") {
-                balance = asset.balance_native;
-            } else if (network === "TRON") {
-                balance = asset.balance_TRX;
-            } else if (network === "SOL") {
-                balance = asset.balance_SOL;
-            } else if (network.startsWith("USDT_")) {
-                balance = asset.balance_USDT;
-            } else if (network.startsWith("USDC_")) {
-                balance = asset.balance_USDC;
+    const pushRows = (list, category) => {
+        for (const item of list) {
+            if (Object.keys(item.assets).length === 0) {
+                // ولت خالی
+                rows.push([category, item.missing_word, item.missing_position,
+                          "-", "-", "0", "0"]);
+                continue;
             }
+            for (const [network, asset] of Object.entries(item.assets)) {
+                let balance = "";
+                if (asset.balance_BTC !== undefined) balance = asset.balance_BTC;
+                else if (asset.balance_native !== undefined) balance = asset.balance_native;
+                else if (asset.balance_TRX !== undefined) balance = asset.balance_TRX;
+                else if (asset.balance_SOL !== undefined) balance = asset.balance_SOL;
+                else if (asset.balance_USDT !== undefined) balance = asset.balance_USDT;
+                else if (asset.balance_USDC !== undefined) balance = asset.balance_USDC;
 
-            rows.push([
-                item.missing_word,
-                item.missing_position,
-                network,
-                asset.address,
-                balance
-            ]);
+                rows.push([
+                    category,
+                    item.missing_word,
+                    item.missing_position,
+                    network,
+                    asset.address,
+                    balance,
+                    asset.transaction_count !== undefined ? asset.transaction_count : ""
+                ]);
+            }
         }
-    }
+    };
+
+    pushRows(resultsBalance, "BALANCE");
+    pushRows(resultsHistory, "HISTORY");
+    pushRows(resultsEmpty,   "EMPTY");
 
     const csv = rows.map(row =>
-        row.map(value =>
-            '"' + String(value).replaceAll('"','""') + '"'
-        ).join(",")
+        row.map(value => '"' + String(value).replaceAll('"','""') + '"').join(",")
     ).join("\n");
 
-    const blob = new Blob(
-        ["\ufeff"+csv],
-        {type:"text/csv;charset=utf-8"}
-    );
-
+    const blob = new Blob(["\ufeff"+csv], { type:"text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
-
     link.href = url;
-    link.download = "wallet-positive-results.csv";
+    link.download = "wallet-recovery-report.csv";
     link.click();
-
     URL.revokeObjectURL(url);
 };
 
+/* ============ شروع ============ */
 
 render();
 
