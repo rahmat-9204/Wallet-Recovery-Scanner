@@ -36,7 +36,7 @@ button { border: 0; background: #1556b8; color: white; font-weight: bold; cursor
 <main>
 
 <h2>Wallet Recovery Scanner</h2>
-<p>بررسی عبارت‌های معتبر + Retry خودکار برای خطای 429 (بدون تکرار در تاریخچه)</p>
+<p>بررسی عبارت‌های معتبر + Retry خودکار برای خطای 429</p>
 
 <div class="warning">
 <strong>⚠ هشدار امنیتی:</strong>
@@ -86,7 +86,7 @@ button { border: 0; background: #1556b8; color: white; font-weight: bold; cursor
 
 <p class="small">
 در صورت خطای 429، کلمه در صف Retry قرار می‌گیرد و در انتهای نوبت دوباره بررسی می‌شود.
-هر کلمه + جایگاه فقط <strong>یک بار</strong> در تاریخچه ثبت می‌شود (بدون تکرار).
+هر کلمه + جایگاه فقط <strong>یک بار</strong> در تاریخچه ثبت می‌شود.
 </p>
 
 </main>
@@ -114,10 +114,10 @@ let resultsBalance  = [];
 let resultsHistory  = [];
 let resultsEmpty    = [];
 
+// صف Retry برای کلمات 429
 let retryQueue = [];
 
-// ⚡ کلیدهای یکتا برای جلوگیری از ثبت تکراری
-// فرمت: `${position}:${word}`
+// ⚡ جلوگیری از ثبت تکراری در تاریخچه
 let seenKeys = new Set();
 
 const MAX_LIMIT = 500;
@@ -137,7 +137,7 @@ function loadAll() {
     try { resultsEmpty   = JSON.parse(localStorage.getItem("wrs_empty")   || "[]"); } catch { resultsEmpty = []; }
     try { retryQueue     = JSON.parse(localStorage.getItem("wrs_retry")   || "[]"); } catch { retryQueue = []; }
 
-    // ساخت مجدد seenKeys از نتایج ذخیره‌شده
+    // بازسازی seenKeys از نتایج ذخیره‌شده
     seenKeys = new Set();
     for (const list of [resultsBalance, resultsHistory, resultsEmpty]) {
         for (const item of list) {
@@ -458,24 +458,15 @@ async function checkUSDC_SOL(owner) {
     return { raw: totalRaw.toString(), balance: Number(totalRaw) / 1e6 };
 }
 
-/* ============ ⚡ ثبت امن (بدون تکرار) ============ */
+/* ============ ثبت امن (بدون تکرار) ============ */
 
-// نوع: "balance" | "history" | "empty"
 function safePush(record, kind) {
     const key = record.missing_position + ":" + record.missing_word;
-
-    // اگر قبلاً ثبت شده، نادیده بگیر
-    if (seenKeys.has(key)) {
-        console.warn("Duplicate skipped:", key);
-        return false;
-    }
-
+    if (seenKeys.has(key)) return false;
     seenKeys.add(key);
-
     if (kind === "balance") resultsBalance.push(record);
     else if (kind === "history") resultsHistory.push(record);
     else resultsEmpty.push(record);
-
     return true;
 }
 
@@ -484,7 +475,7 @@ function safePush(record, kind) {
 async function checkOneWord(words, position, word) {
     const key = position + ":" + word;
 
-    // ⚡ اگر قبلاً موفق ثبت شده، دوباره بررسی نکن
+    // اگر قبلاً ثبت شده → دوباره بررسی نکن
     if (seenKeys.has(key)) {
         return { kind: "duplicate", isRateLimitError: false };
     }
@@ -556,7 +547,7 @@ async function checkOneWord(words, position, word) {
         checks.USDT_TRC20 = { error: checks.TRON ? checks.TRON.error : "TRON failed" };
     }
 
-    // اگر همه شبکه‌ها خطای 429 داشتند
+    // اگر همه شبکه‌ها خطا داشتند و هیچ موفقیتی نبود → Retry
     const successCount = Object.values(checks).filter(c => c && !c.error).length;
 
     if (anyRateLimit && successCount === 0) {
@@ -819,7 +810,7 @@ async function runRetryQueue(words, maxRetry) {
             if (res.kind === "rate_limit") {
                 stillFailing.push({ ...item, retryCount: (item.retryCount || 0) + 1 });
             }
-            // kind="duplicate" → قبلاً ثبت شده، نادیده بگیر
+            // duplicate → قبلاً ثبت شده، نادیده بگیر
         }
 
         retryQueue = stillFailing;
