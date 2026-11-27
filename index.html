@@ -6,88 +6,28 @@
 <title>Wallet Recovery Scanner</title>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f1f4f9;
-    color: #172033;
-    padding: 15px;
-}
-main {
-    max-width: 800px;
-    margin: auto;
-    background: white;
-    padding: 18px;
-    border-radius: 14px;
-}
+body { font-family: Arial, sans-serif; background: #f1f4f9; color: #172033; padding: 15px; }
+main { max-width: 800px; margin: auto; background: white; padding: 18px; border-radius: 14px; }
 h2 { color: #1556b8; }
 h3 { color: #1556b8; margin-top: 24px; }
-textarea,input,button {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 12px;
-    margin: 7px 0;
-    border-radius: 8px;
-    font-size: 15px;
-}
+textarea,input,button { width: 100%; box-sizing: border-box; padding: 12px; margin: 7px 0; border-radius: 8px; font-size: 15px; }
 textarea,input { border: 1px solid #ccd3df; }
-button {
-    border: 0;
-    background: #1556b8;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
+button { border: 0; background: #1556b8; color: white; font-weight: bold; cursor: pointer; }
 .stop { background: #a52a2a; }
 .clear { background: #555; }
 .report { background: #16834a; }
-.warning {
-    background: #fff1d0;
-    color: #674800;
-    padding: 12px;
-    border-radius: 8px;
-    line-height: 1.8;
-}
-.status {
-    background: #edf2fa;
-    padding: 12px;
-    border-radius: 8px;
-    white-space: pre-wrap;
-    line-height: 1.8;
-    font-family: monospace;
-}
-.result {
-    background: #f8f9fc;
-    border: 1px solid #d5dce8;
-    padding: 12px;
-    border-radius: 8px;
-    margin-top: 10px;
-    direction: ltr;
-    text-align: left;
-    overflow-wrap: anywhere;
-}
+.warning { background: #fff1d0; color: #674800; padding: 12px; border-radius: 8px; line-height: 1.8; }
+.status { background: #edf2fa; padding: 12px; border-radius: 8px; white-space: pre-wrap; line-height: 1.8; font-family: monospace; }
+.result { background: #f8f9fc; border: 1px solid #d5dce8; padding: 12px; border-radius: 8px; margin-top: 10px; direction: ltr; text-align: left; overflow-wrap: anywhere; }
 .result.with-balance { border-right: 5px solid #16834a; }
 .result.with-history { border-right: 5px solid #1556b8; }
 .result.empty { border-right: 5px solid #999; opacity: 0.85; }
-.section-title {
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: bold;
-    margin-top: 20px;
-    color: white;
-}
+.section-title { padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 20px; color: white; }
 .section-balance { background: #16834a; }
 .section-history { background: #1556b8; }
 .section-empty   { background: #666; }
-.small {
-    font-size: 13px;
-    color: #667085;
-    line-height: 1.7;
-}
-.row {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
+.small { font-size: 13px; color: #667085; line-height: 1.7; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
 .row > div { flex: 1; min-width: 180px; }
 </style>
 </head>
@@ -96,7 +36,7 @@ button {
 <main>
 
 <h2>Wallet Recovery Scanner</h2>
-<p>بررسی عبارت‌های معتبر + Retry خودکار برای خطای 429</p>
+<p>بررسی عبارت‌های معتبر + Retry خودکار برای خطای 429 (بدون تکرار در تاریخچه)</p>
 
 <div class="warning">
 <strong>⚠ هشدار امنیتی:</strong>
@@ -146,7 +86,7 @@ button {
 
 <p class="small">
 در صورت خطای 429، کلمه در صف Retry قرار می‌گیرد و در انتهای نوبت دوباره بررسی می‌شود.
-این چرخه تا <code>maxRetry</code> بار تکرار می‌شود.
+هر کلمه + جایگاه فقط <strong>یک بار</strong> در تاریخچه ثبت می‌شود (بدون تکرار).
 </p>
 
 </main>
@@ -174,8 +114,11 @@ let resultsBalance  = [];
 let resultsHistory  = [];
 let resultsEmpty    = [];
 
-// صف Retry برای کلمات 429
-let retryQueue = [];   // آرایه‌ای از {position, index, word, retryCount}
+let retryQueue = [];
+
+// ⚡ کلیدهای یکتا برای جلوگیری از ثبت تکراری
+// فرمت: `${position}:${word}`
+let seenKeys = new Set();
 
 const MAX_LIMIT = 500;
 const BACKOFF_FACTOR  = 1.8;
@@ -186,10 +129,24 @@ const RECOVER_FACTOR  = 0.85;
 let adaptiveDelayMs = 0;
 let consecutiveOK = 0;
 
-try { resultsBalance = JSON.parse(localStorage.getItem("wrs_balance") || "[]"); } catch { resultsBalance = []; }
-try { resultsHistory = JSON.parse(localStorage.getItem("wrs_history") || "[]"); } catch { resultsHistory = []; }
-try { resultsEmpty   = JSON.parse(localStorage.getItem("wrs_empty")   || "[]"); } catch { resultsEmpty = []; }
-try { retryQueue     = JSON.parse(localStorage.getItem("wrs_retry")   || "[]"); } catch { retryQueue = []; }
+/* ============ بارگذاری ============ */
+
+function loadAll() {
+    try { resultsBalance = JSON.parse(localStorage.getItem("wrs_balance") || "[]"); } catch { resultsBalance = []; }
+    try { resultsHistory = JSON.parse(localStorage.getItem("wrs_history") || "[]"); } catch { resultsHistory = []; }
+    try { resultsEmpty   = JSON.parse(localStorage.getItem("wrs_empty")   || "[]"); } catch { resultsEmpty = []; }
+    try { retryQueue     = JSON.parse(localStorage.getItem("wrs_retry")   || "[]"); } catch { retryQueue = []; }
+
+    // ساخت مجدد seenKeys از نتایج ذخیره‌شده
+    seenKeys = new Set();
+    for (const list of [resultsBalance, resultsHistory, resultsEmpty]) {
+        for (const item of list) {
+            if (item.missing_word !== undefined && item.missing_position !== undefined) {
+                seenKeys.add(item.missing_position + ":" + item.missing_word);
+            }
+        }
+    }
+}
 
 function saveAll() {
     localStorage.setItem("wrs_balance", JSON.stringify(resultsBalance));
@@ -197,6 +154,8 @@ function saveAll() {
     localStorage.setItem("wrs_empty",   JSON.stringify(resultsEmpty));
     localStorage.setItem("wrs_retry",   JSON.stringify(retryQueue));
 }
+
+loadAll();
 
 function status(t) { $("status").textContent = t; }
 
@@ -259,7 +218,6 @@ function concat(...arrays) {
 }
 
 function hex(bytes) { return [...bytes].map(x=>x.toString(16).padStart(2,"0")).join(""); }
-
 function hash160(data) { return ripemd160(sha256(data)); }
 
 function base58(data) {
@@ -500,15 +458,42 @@ async function checkUSDC_SOL(owner) {
     return { raw: totalRaw.toString(), balance: Number(totalRaw) / 1e6 };
 }
 
+/* ============ ⚡ ثبت امن (بدون تکرار) ============ */
+
+// نوع: "balance" | "history" | "empty"
+function safePush(record, kind) {
+    const key = record.missing_position + ":" + record.missing_word;
+
+    // اگر قبلاً ثبت شده، نادیده بگیر
+    if (seenKeys.has(key)) {
+        console.warn("Duplicate skipped:", key);
+        return false;
+    }
+
+    seenKeys.add(key);
+
+    if (kind === "balance") resultsBalance.push(record);
+    else if (kind === "history") resultsHistory.push(record);
+    else resultsEmpty.push(record);
+
+    return true;
+}
+
 /* ============ بررسی یک کلمه ============ */
 
-// خروجی: { kind, isRateLimitError }
 async function checkOneWord(words, position, word) {
+    const key = position + ":" + word;
+
+    // ⚡ اگر قبلاً موفق ثبت شده، دوباره بررسی نکن
+    if (seenKeys.has(key)) {
+        return { kind: "duplicate", isRateLimitError: false };
+    }
+
     const candidate = words.slice();
     candidate.splice(position, 0, word);
     const mnemonic = candidate.join(" ");
 
-    // فیلتر checksum — مثل نسخه قبل
+    // فیلتر checksum
     if (!validateMnemonic(mnemonic, wordlist)) {
         return { kind: "skip", isRateLimitError: false };
     }
@@ -571,14 +556,11 @@ async function checkOneWord(words, position, word) {
         checks.USDT_TRC20 = { error: checks.TRON ? checks.TRON.error : "TRON failed" };
     }
 
-    // اگر همه شبکه‌ها خطای 429 داشتند، نتیجه را معتبر نمی‌دانیم
-    // و کلمه را به retry می‌فرستیم
+    // اگر همه شبکه‌ها خطای 429 داشتند
     const successCount = Object.values(checks).filter(c => c && !c.error).length;
-    const errorCount   = Object.values(checks).filter(c => c && c.error && c.error !== "stopped").length;
 
     if (anyRateLimit && successCount === 0) {
-        // هیچ شبکه‌ای موفق نبود → قطعاً باید retry شود
-        return { kind: "rate_limit", isRateLimitError: true, addresses, checks };
+        return { kind: "rate_limit", isRateLimitError: true };
     }
 
     // طبقه‌بندی عادی
@@ -595,13 +577,13 @@ async function checkOneWord(words, position, word) {
 
     if (kind === "balance") {
         record.assets = getPositiveAssets(result);
-        resultsBalance.push(record);
+        safePush(record, "balance");
     } else if (kind === "history") {
         record.assets = getHistoryInfo(result);
-        resultsHistory.push(record);
+        safePush(record, "history");
     } else {
         record.assets = {};
-        resultsEmpty.push(record);
+        safePush(record, "empty");
     }
 
     saveAll();
@@ -802,26 +784,21 @@ function saveCursor(c) { localStorage.setItem("wrs_cursor", JSON.stringify(c)); 
 async function runRetryQueue(words, maxRetry) {
     if (retryQueue.length === 0) return;
 
-    status(
-        "🔁 شروع Retry برای " + retryQueue.length + " کلمه...\n" +
-        "(این ممکن است چند دقیقه طول بکشد)"
-    );
+    status("🔁 شروع Retry برای " + retryQueue.length + " کلمه...");
 
     for (let cycle = 1; cycle <= maxRetry; cycle++) {
         if (stopFlag) {
-            status("⏹ Retry متوقف شد. " + retryQueue.length + " کلمه در صف باقی ماند.");
+            status("⏹ Retry متوقف شد. " + retryQueue.length + " کلمه در صف.");
             saveAll();
             return;
         }
-
         if (retryQueue.length === 0) break;
 
         status(
-            "🔁 چرخه Retry " + cycle + "/" + maxRetry + "\n" +
-            "کلمات در صف: " + retryQueue.length
+            "🔁 چرخه " + cycle + "/" + maxRetry +
+            "\nکلمات در صف: " + retryQueue.length
         );
 
-        // تاخیر اضافی بین چرخه‌ها
         const cycleDelay = Math.min(5000 * cycle, 30000);
         await new Promise(r => setTimeout(r, cycleDelay));
 
@@ -829,7 +806,6 @@ async function runRetryQueue(words, maxRetry) {
 
         for (let i = 0; i < retryQueue.length; i++) {
             if (stopFlag) break;
-
             const item = retryQueue[i];
 
             status(
@@ -841,12 +817,9 @@ async function runRetryQueue(words, maxRetry) {
             const res = await checkOneWord(words, item.position, item.word);
 
             if (res.kind === "rate_limit") {
-                stillFailing.push({
-                    ...item,
-                    retryCount: (item.retryCount || 0) + 1
-                });
+                stillFailing.push({ ...item, retryCount: (item.retryCount || 0) + 1 });
             }
-            // بقیه (balance/history/empty/skip) در checkOneWord ذخیره شدند
+            // kind="duplicate" → قبلاً ثبت شده، نادیده بگیر
         }
 
         retryQueue = stillFailing;
@@ -854,7 +827,7 @@ async function runRetryQueue(words, maxRetry) {
         render();
 
         if (retryQueue.length === 0) {
-            status("✅ Retry کامل شد — همه کلمات بررسی شدند.");
+            status("✅ Retry کامل شد.");
             return;
         }
     }
@@ -862,8 +835,7 @@ async function runRetryQueue(words, maxRetry) {
     if (retryQueue.length > 0) {
         status(
             "⚠ بعد از " + maxRetry + " چرخه، " + retryQueue.length +
-            " کلمه هنوز بررسی نشده.\n" +
-            "دوباره «شروع» را بزن تا ادامه دهد."
+            " کلمه هنوز بررسی نشده.\n«شروع» را بزن تا ادامه دهد."
         );
     }
 }
@@ -934,7 +906,6 @@ async function scan() {
             const res = await checkOneWord(words, cursor.position, word);
 
             if (res.kind === "rate_limit") {
-                // به صف retry اضافه کن
                 retryQueue.push({
                     position: cursor.position,
                     index: cursor.index,
@@ -948,7 +919,6 @@ async function scan() {
             saveCursor(cursor);
         }
 
-        // پایان نوبت → اجرای Retry
         if (!stopFlag && retryQueue.length > 0) {
             await runRetryQueue(words, maxRetry);
         }
@@ -995,6 +965,7 @@ $("clear").onclick = () => {
         resultsHistory = [];
         resultsEmpty = [];
         retryQueue = [];
+        seenKeys = new Set();
         render();
         status("پیشرفت پاک شد.");
     }
