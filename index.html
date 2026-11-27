@@ -95,17 +95,6 @@ button {
     flex-wrap: wrap;
 }
 .row > div { flex: 1; min-width: 180px; }
-.badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: bold;
-    margin-left: 6px;
-}
-.badge-green { background: #d4f4e2; color: #0a5f34; }
-.badge-blue  { background: #d7e6ff; color: #0b3a8a; }
-.badge-gray  { background: #e5e5e5; color: #444; }
 </style>
 </head>
 
@@ -143,6 +132,10 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 <label class="small">حداکثر تاخیر (ms)</label>
 <input id="delayMax" type="number" value="5000" min="1000" max="120000" step="100">
 </div>
+<div>
+<label class="small">حداکثر چرخه Retry</label>
+<input id="maxRetry" type="number" value="3" min="1" max="10">
+</div>
 </div>
 
 <button id="start">شروع / ادامه اسکن</button>
@@ -173,7 +166,7 @@ placeholder="۱۱ کلمه انگلیسی را با فاصله وارد کن"></
 
 <p class="small">
 بررسی شبکه‌ها به صورت موازی انجام می‌شود.
-در صورت خطای 429، تاخیر به‌طور خودکار افزایش می‌یابد.
+اگر کلمه‌ای در هر شبکه‌ای خطای شبکه (مثل 429) بگیرد، در لیست retry قرار می‌گیرد و در انتهای نوبت دوباره بررسی می‌شود.
 </p>
 
 </main>
@@ -224,9 +217,12 @@ let stopFlag = false;
 let running = false;
 
 /* سه دسته ذخیره‌سازی */
-let resultsBalance  = [];   // با موجودی
-let resultsHistory  = [];   // با تاریخچه، بدون موجودی
-let resultsEmpty    = [];   // کاملاً خالی
+let resultsBalance  = [];
+let resultsHistory  = [];
+let resultsEmpty    = [];
+
+/* لیست کلماتی که در آن‌ها خطای شبکه رخ داده */
+let retryQueue = [];   // [{words11, position, word, retryCount}]
 
 const MAX_LIMIT = 500;
 
@@ -293,6 +289,7 @@ function onRequestError(err) {
             adaptiveDelayMs = BACKOFF_MAX_MS;
         }
     }
+    return isRateLimit;
 }
 
 /* ============ بارگذاری از localStorage ============ */
@@ -309,12 +306,17 @@ function loadAll() {
     try {
         resultsEmpty = JSON.parse(localStorage.getItem("wrs_empty") || "[]");
     } catch { resultsEmpty = []; }
+
+    try {
+        retryQueue = JSON.parse(localStorage.getItem("wrs_retry") || "[]");
+    } catch { retryQueue = []; }
 }
 
 function saveAll() {
     localStorage.setItem("wrs_balance", JSON.stringify(resultsBalance));
     localStorage.setItem("wrs_history", JSON.stringify(resultsHistory));
     localStorage.setItem("wrs_empty",   JSON.stringify(resultsEmpty));
+    localStorage.setItem("wrs_retry",   JSON.stringify(retryQueue));
 }
 
 loadAll();
@@ -514,7 +516,6 @@ async function rpc(url,method,params) {
     return data.result;
 }
 
-/* --- BTC: موجودی + تعداد تراکنش --- */
 async function checkBTC(address) {
     const data = await fetchJSON(
         "https://blockstream.info/api/address/" + encodeURIComponent(address)
@@ -529,7 +530,6 @@ async function checkBTC(address) {
     };
 }
 
-/* --- ETH/BNB: موجودی + nonce (تعداد تراکنش خروجی) --- */
 async function checkEVM(url,address) {
     const [balanceHex, nonceHex] = await Promise.all([
         rpc(url, "eth_getBalance", [address, "latest"]),
@@ -541,7 +541,6 @@ async function checkEVM(url,address) {
     };
 }
 
-/* --- ERC20/BEP20 balanceOf --- */
 function makeBalanceOfData(address) {
     return "0x70a08231" + address.slice(2).toLowerCase().padStart(64,"0");
 }
@@ -559,17 +558,14 @@ async function checkToken_EVM(url,address,contract,decimals) {
     };
 }
 
-/* --- TRON: موجودی + تعداد تراکنش --- */
 const USDT_TRON_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
 async function checkTRON(address) {
-    // اطلاعات اکانت (موجودی + توکن‌ها)
     const account = await fetchJSON(
         "https://api.trongrid.io/v1/accounts/" + encodeURIComponent(address)
     );
     const data = account.data && account.data.length ? account.data[0] : null;
 
-    // تعداد تراکنش‌ها
     let txCount = 0;
     try {
         const txResp = await fetchJSON(
@@ -603,7 +599,6 @@ function checkTRON_USDT(tronData) {
     return { raw:"0", balance:0 };
 }
 
-/* --- Solana: موجودی + تعداد تراکنش --- */
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 const USDC_SOL_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
@@ -767,21 +762,18 @@ function renderCard(item, kind) {
 }
 
 function render() {
-    // بخش ۱
     $("resultsBalance").innerHTML = "";
     $("countBalance").textContent = resultsBalance.length;
     for (const item of resultsBalance.slice().reverse()) {
         $("resultsBalance").appendChild(renderCard(item, "balance"));
     }
 
-    // بخش ۲
     $("resultsHistory").innerHTML = "";
     $("countHistory").textContent = resultsHistory.length;
     for (const item of resultsHistory.slice().reverse()) {
         $("resultsHistory").appendChild(renderCard(item, "history"));
     }
 
-    // بخش ۳
     $("resultsEmpty").innerHTML = "";
     $("countEmpty").textContent = resultsEmpty.length;
     for (const item of resultsEmpty.slice().reverse()) {
@@ -875,10 +867,9 @@ function getPositiveAssets(result) {
     return positive;
 }
 
-/* ============ تاریخچه تراکنش‌ها (برای ولت خالی) ============ */
+/* ============ تاریخچه تراکنش‌ها ============ */
 
 function getHistoryInfo(result) {
-    // برای ولت‌هایی که موجودی صفر دارند اما تراکنش داشتند
     const info = {};
 
     for (const [network, data] of Object.entries(result.checks)) {
@@ -914,6 +905,200 @@ function getHistoryInfo(result) {
     return info;
 }
 
+/* ============ بررسی یک عبارت ============ */
+
+// خروجی: { kind, hasNetworkError }
+async function processCandidate(candidateWords, position) {
+    const mnemonic = candidateWords.join(" ");
+    const seed = mnemonicToSeedSync(mnemonic);
+    const solAddr = await solanaAddress(seed);
+
+    const addresses = {
+        ...bitcoinAddresses(seed),
+        ETH:  evmAddress(seed),
+        BNB:  evmAddress(seed),
+        TRON: tronAddress(seed),
+        SOL:  solAddr
+    };
+
+    const ETH_RPC = "https://ethereum-rpc.publicnode.com";
+    const BSC_RPC = "https://bsc-rpc.publicnode.com";
+    const USDT_ERC20 = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+    const USDC_ERC20 = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const USDT_BEP20 = "0x55d398326f99059fF775485246999027B3197955";
+    const USDC_BEP20 = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+
+    const checks = {};
+    let hasNetworkError = false;
+
+    const wrap = (name, fn) => {
+        return (async () => {
+            if (stopFlag) {
+                checks[name] = { error: "stopped" };
+                return;
+            }
+            await adaptiveDelay();
+            try {
+                const v = await fn();
+                checks[name] = v;
+                onRequestSuccess();
+            } catch (e) {
+                checks[name] = { error: String(e && (e.message || e)) };
+                onRequestError(e);
+                hasNetworkError = true;   // ⚡ این کلمه باید retry شود
+            }
+        })();
+    };
+
+    const tasks = [];
+    tasks.push(wrap("BTC_Legacy",      () => checkBTC(addresses.BTC_Legacy)));
+    tasks.push(wrap("BTC_NestedSegWit", () => checkBTC(addresses.BTC_NestedSegWit)));
+    tasks.push(wrap("BTC_NativeSegWit", () => checkBTC(addresses.BTC_NativeSegWit)));
+    tasks.push(wrap("ETH",  () => checkEVM(ETH_RPC, addresses.ETH)));
+    tasks.push(wrap("USDT_ERC20", () => checkToken_EVM(ETH_RPC, addresses.ETH, USDT_ERC20, 6)));
+    tasks.push(wrap("USDC_ERC20", () => checkToken_EVM(ETH_RPC, addresses.ETH, USDC_ERC20, 6)));
+    tasks.push(wrap("BNB",  () => checkEVM(BSC_RPC, addresses.BNB)));
+    tasks.push(wrap("USDT_BEP20", () => checkToken_EVM(BSC_RPC, addresses.BNB, USDT_BEP20, 18)));
+    tasks.push(wrap("USDC_BEP20", () => checkToken_EVM(BSC_RPC, addresses.BNB, USDC_BEP20, 18)));
+    tasks.push(wrap("TRON", () => checkTRON(addresses.TRON)));
+    tasks.push(wrap("SOL",  () => checkSOL(addresses.SOL)));
+    tasks.push(wrap("USDC_SOL", () => checkUSDC_SOL(addresses.SOL)));
+
+    await Promise.all(tasks);
+
+    if (checks.TRON && !checks.TRON.error) {
+        checks.USDT_TRC20 = checkTRON_USDT(checks.TRON);
+    } else {
+        checks.USDT_TRC20 = {
+            error: checks.TRON ? checks.TRON.error : "TRON check failed"
+        };
+    }
+
+    const result = { addresses, checks };
+    const kind = classifyWallet(result);
+
+    return { result, kind, hasNetworkError };
+}
+
+/* ============ ثبت در لیست ============ */
+
+function recordResult(candidateWords, position, result, kind) {
+    const record = {
+        missing_word: candidateWords[position],
+        missing_position: position + 1,
+        addresses: result.addresses,
+        assets: {},
+        found_at: new Date().toISOString()
+    };
+
+    if (kind === "balance") {
+        record.assets = getPositiveAssets(result);
+        resultsBalance.push(record);
+    } else if (kind === "history") {
+        record.assets = getHistoryInfo(result);
+        resultsHistory.push(record);
+    } else {
+        record.assets = {};
+        resultsEmpty.push(record);
+    }
+
+    saveAll();
+    render();
+
+    if (kind === "balance") {
+        status(
+            "🟢 دارایی پیدا شد!\n" +
+            "کلمه: " + record.missing_word +
+            "\nجایگاه: " + record.missing_position
+        );
+    } else if (kind === "history") {
+        status(
+            "🔵 ولت با تاریخچه پیدا شد (بدون موجودی)\n" +
+            "کلمه: " + record.missing_word +
+            "\nجایگاه: " + record.missing_position
+        );
+    }
+}
+
+/* ============ حلقه Retry ============ */
+
+async function runRetryQueue(maxRetry) {
+    if (retryQueue.length === 0) return;
+
+    status("🔁 شروع Retry برای " + retryQueue.length + " کلمه...");
+
+    for (let cycle = 1; cycle <= maxRetry; cycle++) {
+        if (stopFlag) {
+            status("⏹ Retry متوقف شد. " + retryQueue.length + " کلمه در صف.");
+            saveAll();
+            return;
+        }
+        if (retryQueue.length === 0) break;
+
+        status(
+            "🔁 چرخه Retry " + cycle + "/" + maxRetry +
+            "\nکلمات در صف: " + retryQueue.length
+        );
+
+        // تاخیر اضافی بین چرخه‌ها
+        const cycleDelay = Math.min(3000 * cycle, 20000);
+        await new Promise(r => setTimeout(r, cycleDelay));
+
+        const stillFailing = [];
+
+        for (let i = 0; i < retryQueue.length; i++) {
+            if (stopFlag) break;
+
+            const item = retryQueue[i];
+
+            status(
+                "🔁 چرخه " + cycle + "/" + maxRetry +
+                " — کلمه " + (i+1) + "/" + retryQueue.length +
+                " — جایگاه " + (item.position + 1)
+            );
+
+            const candidateWords = item.words11.split(" ");
+            const candidate = candidateWords.slice();
+            candidate.splice(item.position, 0, item.word);
+
+            // بررسی مجدد checksum
+            if (!validateMnemonic(candidate.join(" "), wordlist)) {
+                continue; // این کلمه اصلاً معتبر نیست، رد شو
+            }
+
+            const { result, kind, hasNetworkError } =
+                await processCandidate(candidate, item.position);
+
+            if (hasNetworkError) {
+                stillFailing.push({
+                    ...item,
+                    retryCount: (item.retryCount || 0) + 1
+                });
+                // ⚡ به هیچ لیستی اضافه نمی‌شود، فقط retry
+            } else {
+                // موفق بود → ثبت کن
+                recordResult(candidate, item.position, result, kind);
+            }
+        }
+
+        retryQueue = stillFailing;
+        saveAll();
+        render();
+
+        if (retryQueue.length === 0) {
+            status("✅ Retry کامل شد — همه کلمات بررسی شدند.");
+            return;
+        }
+    }
+
+    if (retryQueue.length > 0) {
+        status(
+            "⚠ بعد از " + maxRetry + " چرخه، " + retryQueue.length +
+            " کلمه هنوز بررسی نشده.\n«شروع» را بزن تا ادامه دهد."
+        );
+    }
+}
+
 /* ============ اسکنر اصلی ============ */
 
 async function scan() {
@@ -941,6 +1126,7 @@ async function scan() {
 
     let cursor = getCursor();
     const limit = Math.max(1, Math.min(MAX_LIMIT, Number($("limit").value) || 5));
+    const maxRetry = Math.max(1, Math.min(10, Number($("maxRetry").value) || 3));
     let checked = 0;
 
     status("اسکن شروع شد...");
@@ -973,110 +1159,24 @@ async function scan() {
                 "\nتاخیر فعلی: " + mn + "–" + mx + " ms" +
                 (adaptiveDelayMs > 0
                     ? "\n⚠ افزایش تاخیر: +" + adaptiveDelayMs + " ms"
-                    : "")
+                    : "") +
+                "\n📋 صف Retry: " + retryQueue.length
             );
 
-            const mnemonic = candidate.join(" ");
-            const seed = mnemonicToSeedSync(mnemonic);
-            const solAddr = await solanaAddress(seed);
+            const { result, kind, hasNetworkError } =
+                await processCandidate(candidate, cursor.position);
 
-            const addresses = {
-                ...bitcoinAddresses(seed),
-                ETH:  evmAddress(seed),
-                BNB:  evmAddress(seed),
-                TRON: tronAddress(seed),
-                SOL:  solAddr
-            };
-
-            const ETH_RPC = "https://ethereum-rpc.publicnode.com";
-            const BSC_RPC = "https://bsc-rpc.publicnode.com";
-            const USDT_ERC20 = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-            const USDC_ERC20 = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-            const USDT_BEP20 = "0x55d398326f99059fF775485246999027B3197955";
-            const USDC_BEP20 = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
-
-            const checks = {};
-
-            const wrap = (name, fn) => {
-                return (async () => {
-                    if (stopFlag) {
-                        checks[name] = { error: "stopped" };
-                        return;
-                    }
-                    await adaptiveDelay();
-                    try {
-                        const v = await fn();
-                        checks[name] = v;
-                        onRequestSuccess();
-                    } catch (e) {
-                        checks[name] = { error: String(e && (e.message || e)) };
-                        onRequestError(e);
-                    }
-                })();
-            };
-
-            const tasks = [];
-            tasks.push(wrap("BTC_Legacy",      () => checkBTC(addresses.BTC_Legacy)));
-            tasks.push(wrap("BTC_NestedSegWit", () => checkBTC(addresses.BTC_NestedSegWit)));
-            tasks.push(wrap("BTC_NativeSegWit", () => checkBTC(addresses.BTC_NativeSegWit)));
-            tasks.push(wrap("ETH",  () => checkEVM(ETH_RPC, addresses.ETH)));
-            tasks.push(wrap("USDT_ERC20", () => checkToken_EVM(ETH_RPC, addresses.ETH, USDT_ERC20, 6)));
-            tasks.push(wrap("USDC_ERC20", () => checkToken_EVM(ETH_RPC, addresses.ETH, USDC_ERC20, 6)));
-            tasks.push(wrap("BNB",  () => checkEVM(BSC_RPC, addresses.BNB)));
-            tasks.push(wrap("USDT_BEP20", () => checkToken_EVM(BSC_RPC, addresses.BNB, USDT_BEP20, 18)));
-            tasks.push(wrap("USDC_BEP20", () => checkToken_EVM(BSC_RPC, addresses.BNB, USDC_BEP20, 18)));
-            tasks.push(wrap("TRON", () => checkTRON(addresses.TRON)));
-            tasks.push(wrap("SOL",  () => checkSOL(addresses.SOL)));
-            tasks.push(wrap("USDC_SOL", () => checkUSDC_SOL(addresses.SOL)));
-
-            await Promise.all(tasks);
-
-            if (checks.TRON && !checks.TRON.error) {
-                checks.USDT_TRC20 = checkTRON_USDT(checks.TRON);
+            if (hasNetworkError) {
+                // به صف retry اضافه کن
+                retryQueue.push({
+                    words11: words.join(" "),
+                    position: cursor.position,
+                    word: wordlist[cursor.index],
+                    retryCount: 0
+                });
+                saveAll();
             } else {
-                checks.USDT_TRC20 = {
-                    error: checks.TRON ? checks.TRON.error : "TRON check failed"
-                };
-            }
-
-            const result = { addresses, checks };
-            const kind = classifyWallet(result);
-
-            const record = {
-                missing_word: candidate[cursor.position],
-                missing_position: cursor.position + 1,
-                addresses: addresses,
-                assets: {},
-                found_at: new Date().toISOString()
-            };
-
-            if (kind === "balance") {
-                record.assets = getPositiveAssets(result);
-                resultsBalance.push(record);
-            } else if (kind === "history") {
-                record.assets = getHistoryInfo(result);
-                resultsHistory.push(record);
-            } else {
-                // ولت خالی: فقط آدرس‌ها را ذخیره کن
-                record.assets = {};
-                resultsEmpty.push(record);
-            }
-
-            saveAll();
-            render();
-
-            if (kind === "balance") {
-                status(
-                    "🟢 دارایی پیدا شد!\n" +
-                    "کلمه: " + record.missing_word +
-                    "\nجایگاه: " + record.missing_position
-                );
-            } else if (kind === "history") {
-                status(
-                    "🔵 ولت با تاریخچه پیدا شد (بدون موجودی)\n" +
-                    "کلمه: " + record.missing_word +
-                    "\nجایگاه: " + record.missing_position
-                );
+                recordResult(candidate, cursor.position, result, kind);
             }
 
             cursor.index++;
@@ -1084,14 +1184,21 @@ async function scan() {
             candidate.fill("");
         }
 
+        // پایان نوبت → اجرای Retry
+        if (!stopFlag && retryQueue.length > 0) {
+            await runRetryQueue(maxRetry);
+        }
+
         if (cursor.position >= 12) {
-            status("بررسی تمام جایگاه‌ها پایان یافت.");
+            status("بررسی تمام جایگاه‌ها پایان یافت." +
+                (retryQueue.length > 0 ? "\n⚠ " + retryQueue.length + " کلمه در Retry باقی ماند." : ""));
         } else if (stopFlag) {
             status("اسکن متوقف شد؛ پیشرفت ذخیره شد.");
         } else {
             status(
                 "این نوبت تمام شد.\n" +
                 checked + " عبارت معتبر بررسی شد.\n" +
+                (retryQueue.length > 0 ? "📋 " + retryQueue.length + " کلمه در Retry باقی ماند.\n" : "") +
                 "برای ادامه دوباره شروع را بزن."
             );
         }
@@ -1125,9 +1232,11 @@ $("clear").onclick = () => {
         localStorage.removeItem("wrs_balance");
         localStorage.removeItem("wrs_history");
         localStorage.removeItem("wrs_empty");
+        localStorage.removeItem("wrs_retry");
         resultsBalance = [];
         resultsHistory = [];
         resultsEmpty = [];
+        retryQueue = [];
         render();
         status("پیشرفت پاک شد.");
     }
@@ -1143,7 +1252,6 @@ $("csv").onclick = () => {
     const pushRows = (list, category) => {
         for (const item of list) {
             if (Object.keys(item.assets).length === 0) {
-                // ولت خالی
                 rows.push([category, item.missing_word, item.missing_position,
                           "-", "-", "0", "0"]);
                 continue;
